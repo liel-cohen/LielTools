@@ -3,8 +3,8 @@ from keras.callbacks import Callback
 import pandas as pd
 import sys
 
-if 'LielTools_4' in sys.modules:
-    from LielTools_4.KerasTools import model_predict_evaluate
+if 'LielTools' in sys.modules:
+    from LielTools.KerasTools import model_predict_evaluate
 else:
     from KerasTools import model_predict_evaluate
 

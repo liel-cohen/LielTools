@@ -8,8 +8,8 @@ from collections import Counter
 import random
 from scipy import sparse
 
-if 'LielTools_4' in sys.modules:
-    from LielTools_4 import FileTools
+if 'LielTools' in sys.modules:
+    from LielTools import FileTools
 else:
     import FileTools
 

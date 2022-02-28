@@ -15,10 +15,10 @@ import math
 from scipy import stats
 from sklearn.metrics import confusion_matrix
 
-if 'LielTools_4' in sys.modules:
-    from LielTools_4 import DataTools
-    from LielTools_4 import PlotTools
-    from LielTools_4 import FileTools
+if 'LielTools' in sys.modules:
+    from LielTools import DataTools
+    from LielTools import PlotTools
+    from LielTools import FileTools
 else:
     import DataTools
     import PlotTools

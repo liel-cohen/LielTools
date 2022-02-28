@@ -13,15 +13,15 @@ from sklearn.metrics import auc
 import warnings
 import math
 
-if 'LielTools_4' in sys.modules:
-    from LielTools_4 import FileTools
-    from LielTools_4.DataGenerator import data_generator
-    from LielTools_4 import seqTools as SeqC
-    from LielTools_4 import PlotTools
+if 'LielTools' in sys.modules:
+    from LielTools import FileTools
+    from LielTools.DataGenerator import data_generator
+    from LielTools import seqTools as SeqC
+    from LielTools import PlotTools
 else:
     import FileTools
     from DataGenerator import data_generator
-    import seqTools as SeqC
+    from LielTools_4.LielTools.RepertoireTools import seqTools as SeqC
     import PlotTools
 
 

@@ -8,11 +8,11 @@ import copy as copy_module
 import matplotlib.pyplot as plt
 import warnings
 
-if 'LielTools_4' in sys.modules:
-    from LielTools_4 import FileTools
-    from LielTools_4 import DataTools
-    from LielTools_4 import PlotTools
-    from LielTools_4 import MyLabelEncoder
+if 'LielTools' in sys.modules:
+    from LielTools import FileTools
+    from LielTools import DataTools
+    from LielTools import PlotTools
+    from LielTools import MyLabelEncoder
 else:
     import FileTools
     import DataTools

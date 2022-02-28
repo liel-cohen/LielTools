@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 import os
 import numpy as np
 
-if 'LielTools_4' in sys.modules:
-    from LielTools_4 import PlotTools
-    from LielTools_4 import FileTools
-    from LielTools_4 import DataTools
+if 'LielTools' in sys.modules:
+    from LielTools import PlotTools
+    from LielTools import FileTools
+    from LielTools import DataTools
 else:
     import PlotTools
     import FileTools

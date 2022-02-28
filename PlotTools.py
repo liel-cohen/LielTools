@@ -1,8 +1,8 @@
 import sys
 
-if 'LielTools_4' in sys.modules:
-    from LielTools_4 import DataTools
-    from LielTools_4 import StatsTools
+if 'LielTools' in sys.modules:
+    from LielTools import DataTools
+    from LielTools import StatsTools
 else:
     import DataTools
     import StatsTools

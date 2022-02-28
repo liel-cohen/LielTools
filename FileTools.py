@@ -10,8 +10,8 @@ from scipy.sparse import csr_matrix
 import pickle
 import json
 
-if 'LielTools_4' in sys.modules:
-    from LielTools_4 import DataTools
+if 'LielTools' in sys.modules:
+    from LielTools import DataTools
 else:
     import DataTools
 

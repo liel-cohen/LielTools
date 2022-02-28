@@ -3,8 +3,8 @@ import bokeh.models as bmo
 import matplotlib.cm as cm
 import sys
 
-if 'LielTools_4' in sys.modules:
-    from LielTools_4 import PlotTools
+if 'LielTools' in sys.modules:
+    from LielTools import PlotTools
 else:
     import PlotTools
 

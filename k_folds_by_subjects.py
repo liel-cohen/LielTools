@@ -3,9 +3,9 @@ import numpy as np
 import random
 import sys
 
-if 'LielTools_4' in sys.modules:
-    from LielTools_4 import DataTools
-    from LielTools_4 import FileTools
+if 'LielTools' in sys.modules:
+    from LielTools import DataTools
+    from LielTools import FileTools
 else:
     import DataTools
     import FileTools
