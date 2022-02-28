@@ -1,0 +1,5 @@
+Anaconda 3
+and also packages:
+dill
+palettable
+plotly
