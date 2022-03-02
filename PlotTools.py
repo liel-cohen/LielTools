@@ -1260,46 +1260,83 @@ def plot_scatter_hue(series_x, series_y, series_hue=None,
     return fig11
 
 # former plotScatter
-def plot_scatter(seriesX, seriesY, pltCorr=True, showRegLine=True,
-                 ax=None, saveFolder=None,
-                 saveFullPath=None, figsize=(6, 5),
-                 plotTitle='', xTitle='', yTitle='',
-                 dots_color='teal', dots_alpha=0.6,
-                 ylim=None,
-                 xRotation=45, titleFontSize=18, corrFontSize=14,
-                 titleColor='maroon', xticks=None, font_scale=1,
-                 snsStyle='ticks', plotPearson=True, plotSpearman=True,
-                 axesTitleFontSize=14,
+def plot_scatter(x_series, y_series,
+                 ax=None, figsize=(6, 5),
+                 show_reg_line=True,
+                 plt_corr_txt=True, plot_pearson=True, plot_spearman=True,
+                 plot_title='', x_title='', y_title='',
+                 font_scale=1, sns_style='ticks',
+                 markers_color='teal', markers_alpha=0.6,
+                 x_rotation=45, title_font_size=18, corr_font_size=14,
+                 title_color='maroon', xticks=None,
+                 axes_title_font_size=14,
                  x_jitter=None, y_jitter=None,
-                 correl_text_x_loc=0.2, correl_text_y_loc=0.96):
+                 ylim=None,
+                 correl_text_x_loc=0.2, correl_text_y_loc=0.96,
+                 save_folder=None, save_full_path=None,
+                 ):
+    """
+
+    @param x_series: pd.Series. x values series.
+    @param y_series: pd.Series. y values series.
+    @param ax: matplotlib axes object to plot over. Default None
+    @param figsize: tuple (length 2) with numbers indicating figure size. Default (6, 5)
+    @param show_reg_line: boolean. Whether to add a regression line. Default True
+    @param plt_corr_txt: boolean. Whether to add correlation text. Default True
+    @param plot_pearson: boolean. Whether to add the Pearson correlation text. Default True
+    @param plot_spearman: boolean. Whether to add the Pearson correlation text. Default True
+    @param plot_title: str. Title to be added. Default ''
+    @param x_title: str. x axis label to use instead of the x series name.
+    @param y_title: str. y axis label to use instead of the y series name.
+    @param font_scale: number. Seaborn fontscale. Default 1
+    @param sns_style: str. Seaborn style. Default 'ticks'
+    @param markers_color: markers color. Default 'teal'
+    @param markers_alpha: markers alpha (opacity, between 0-1). Default 0.6
+    @param x_rotation: x tick labels rotation (0-360). Default 45
+    @param title_font_size: title font size. Default 18
+    @param corr_font_size: correlation text font size. Default 18
+    @param title_color: title color. Default 'maroon'
+    @param xticks: xticks values to use instead of the automatically set ones. Default None
+    @param axes_title_font_size: the axes labels (titles) font size. Default 14
+    @param x_jitter: boolean. Whether to add jitter to x values (relevant if they are integers). Default False
+    @param y_jitter: boolean. Whether to add jitter to y values (relevant if they are integers). Default False
+    @param ylim: tuple (length 2) with numbers indicating y axis limits, instead of the automatically set ones. Default None
+    @param correl_text_x_loc: Float. Starting position of the correlation text in the x axis. Default 0.2
+    @param correl_text_y_loc: Float. Starting position of the correlation text in the y axis. Default 0.96
+    @param save_folder: str. Folder to save the figure (file name determined automatically). Default None
+    @param save_full_path: str. Full path to save the figure. Default None
+    @return:
+    """
+
+
     sns.set(font_scale=font_scale)
-    sns.set_style(snsStyle)
+    sns.set_style(sns_style)
 
-    data = DataTools.join_non_empty_series_f_list([seriesX, seriesY])
+    data = DataTools.join_non_empty_series_f_list([x_series, y_series])
 
-    if xTitle=='': xTitle = DataTools.get_col_name(seriesX)
-    if yTitle=='': yTitle = DataTools.get_col_name(seriesY)
+    if x_title== '': x_title = DataTools.get_col_name(x_series)
+    if y_title== '': y_title = DataTools.get_col_name(y_series)
 
-    fontTitle = {'size': titleFontSize, 'color': titleColor, 'weight': 'bold'}
-    fig11 = sns.regplot(x=data[DataTools.get_col_name(seriesX)],
-                        y=data[DataTools.get_col_name(seriesY)],
-                        ax=ax, color=dots_color, fit_reg=showRegLine,
+    fontTitle = {'size': title_font_size, 'color': title_color, 'weight': 'bold'}
+    fig11 = sns.regplot(x=data[DataTools.get_col_name(x_series)],
+                        y=data[DataTools.get_col_name(y_series)],
+                        ax=ax, color=markers_color, fit_reg=show_reg_line,
                         x_jitter=x_jitter, y_jitter=y_jitter,
-                        scatter_kws={'alpha': dots_alpha})
+                        scatter_kws={'alpha': markers_alpha})
 
-    if pltCorr:
-        add_correls_to_fig(fig11, data[DataTools.get_col_name(seriesX)],
-                           data[DataTools.get_col_name(seriesY)],
-                           font_size=corrFontSize, plotPearson=plotPearson,
-                           plotSpearman=plotSpearman,
+    if plt_corr_txt:
+        add_correls_to_fig(fig11, data[DataTools.get_col_name(x_series)],
+                           data[DataTools.get_col_name(y_series)],
+                           font_size=corr_font_size, plotPearson=plot_pearson,
+                           plotSpearman=plot_spearman,
                            text_x_loc=correl_text_x_loc,
                            text_y_loc=correl_text_y_loc)
     fig11.figure.set_size_inches(figsize)
     if xticks is not None: fig11.set(xticks=xticks)
-    fig11.set_xlabel(xTitle, fontdict={'size': axesTitleFontSize})
-    fig11.set_ylabel(yTitle, fontdict={'size': axesTitleFontSize})
-    fig11.set_title(plotTitle, fontdict=fontTitle)
-    plt.xticks(rotation=xRotation)
+    fig11.set_xlabel(x_title, fontdict={'size': axes_title_font_size})
+    fig11.set_ylabel(y_title, fontdict={'size': axes_title_font_size})
+    fig11.set_title(plot_title, fontdict=fontTitle)
+    plt.xticks(rotation=x_rotation)
 
     # fig11.figure.subplots_adjust(right=0.2, bottom=0.2)
     if ylim is not None: plt.ylim(ylim)
@@ -1311,12 +1348,12 @@ def plot_scatter(seriesX, seriesY, pltCorr=True, showRegLine=True,
 
     plt.tight_layout()
 
-    if saveFolder is not None:
-        fileName = 'Scatter - ' + xTitle + ' VS ' + yTitle + '.jpg'
-        save_plt(save_path=saveFolder + fileName)
+    if save_folder is not None:
+        fileName = 'Scatter - ' + x_title + ' VS ' + y_title + '.jpg'
+        save_plt(save_path=save_folder + fileName)
 
-    if saveFullPath is not None:
-        save_plt(save_path=saveFullPath)
+    if save_full_path is not None:
+        save_plt(save_path=save_full_path)
 
 
 def plotScatterLine(seriesX, seriesY, ax=None, saveFolder=None,

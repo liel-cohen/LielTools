@@ -144,10 +144,11 @@ def getCorrelationsWithVars(Xdata, Ydata, method='pearson'): # or 'spearman'
 
     return({'coeffMat': coeffMat, 'pvalMat': pvalMat})
 
-''' gets a matrix DF of Pvalues
-returns a dict with 2 matrix DFs of multiplicity adjusted Pvalues:
-{'FWER': .., 'FDR': ..} '''
+
 def correctedPvalsFromMatrixDF(pvalsDF):
+    ''' gets a matrix DF of Pvalues
+    returns a dict with 2 matrix DFs of multiplicity adjusted Pvalues:
+    {'FWER': .., 'FDR': ..} '''
     pvals = pvalsDF.copy()
 
     pvalsFlattened = pvals.unstack().copy()    # flatten matrix
@@ -247,7 +248,7 @@ def adjustY4vars(data, yColName, xColsNamesList, ResidualsVsFitted=True):
 
     if ResidualsVsFitted:
         fitted = pd.DataFrame(result.predict(sm.add_constant(data[xColsNamesList])))
-        PlotTools.plot_scatter(fitted, pd.DataFrame(controlled), pltCorr=True, showRegLine=True, plotTitle='', xTitle='Fitted', yTitle='Residuals', titleFontSize=18, corrFontSize=8)
+        PlotTools.plot_scatter(fitted, pd.DataFrame(controlled), plt_corr_txt=True, show_reg_line=True, plot_title='', x_title='Fitted', y_title='Residuals', title_font_size=18, corr_font_size=8)
         plt.show()
 
     return (controlled)
@@ -355,8 +356,9 @@ def GLM_model(df, y_col_name, x_cols_list, logistic=True,
         if logistic:
             results_dict['Fold change'] = df_no_na[x_cols_list].loc[df_no_na[y_col_name] == 1].mean() / \
                                           df_no_na[x_cols_list].loc[df_no_na[y_col_name] == 0].mean()
-            if calc_roc_auc: results_dict['roc_auc_info'] = roc_auc(y_true=results_dict['y_true'],
-                                                   y_pred=y_pred)
+            if calc_roc_auc:
+                results_dict['roc_auc_info'] = roc_auc(y_true=results_dict['y_true'],
+                                                       y_pred=y_pred)
         else:
             results_dict['RMSE'] = root_mean_squared_error(results_dict['y_true'],
                                                            results_dict['y_pred'])
