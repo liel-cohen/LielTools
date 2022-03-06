@@ -7,6 +7,7 @@ import sys
 from collections import Counter
 import random
 from scipy import sparse
+from scipy.spatial.distance import pdist,squareform
 
 if 'LielTools' in sys.modules:
     from LielTools import FileTools
@@ -545,5 +546,99 @@ def get_ordered_unique_vals_from_list(mylist):
     uniq = [x for x in mylist if x not in used and (used.add(x) or True)]
     return uniq
 
-def eilay_check():
-    print("is it a new brach?")
+def distance_between_tow_clusters(cluster1,cluster2,pdist_metric="jaccard",difult_identicle_clusters = 1):
+    """
+    Get tow dataframe each with the same cols. Each col is a fetcher.
+    Each row is a subject. can't be a partly overlap between clusters.
+    Will return a dict distance between the clusters.
+
+    :param cluster1: pandas dataframe
+    :param cluster2: pandas dataframe
+    :pdist_metric:metric str or function, optional
+    The distance metric to use. The distance function can be ‘braycurtis’, ‘canberra’, ‘chebyshev’, ‘cityblock’,
+     ‘correlation’, ‘cosine’, ‘dice’, ‘euclidean’, ‘hamming’, ‘jaccard’, ‘jensenshannon’, ‘kulsinski’, ‘kulczynski1’,
+     ‘mahalanobis’, ‘matching’, ‘minkowski’, ‘rogerstanimoto’, ‘russellrao’, ‘seuclidean’, ‘sokalmichener’, ‘sokalsneath’,
+      ‘sqeuclidean’, ‘yule’. from https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.distance.pdist.html
+
+    """
+    assert (cluster1.columns == cluster2.columns).all(), "The tow dataframe need to have the same cols"
+
+
+    if len(set(cluster1.index.intersection(cluster2.index))) != 0 :#is their overlap
+        if set(cluster1.index) == set(cluster2.index):#is they the same?
+            return {"mean_distance": difult_identicle_clusters,
+                    "max_distance": difult_identicle_clusters,
+                    "min_distance": difult_identicle_clusters,
+                    "median_distance": difult_identicle_clusters,
+                    "std_median": difult_identicle_clusters}
+        else:
+            raise ValueError("can't be a partly overlap between clusters")
+
+    contact_clusters = pd.concat([cluster1,cluster2])
+    distance_metrix = make_dist_df(contact_clusters.T)
+    #distance_metrix = pd.DataFrame(squareform(pdist(contact_clusters,metric = pdist_metric)),index=contact_clusters.index,columns=contact_clusters.index)
+
+    return {"mean_distance": flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).mean(axis=1)[0],
+            "max_distance" : flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).max(axis=1)[0],
+            "min_distance" : flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).min(axis=1)[0],
+            "median_distance": flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).median(axis=1)[0],
+            "std_median": flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).std(axis=1)[0]}
+
+def flat_df_to_sereis(df):
+    v = df.unstack().to_frame().sort_index(level=1).T
+    v.columns = v.columns.map('_'.join)
+    return v
+
+def make_dist_df(numeric_dataframe,how="jaccard",diagonal_value = 1):
+    """
+    http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.352.6123&rep=rep1&type=pdf
+    the artical of binarry distance
+    :param numeric_dataframe:
+    rows are featchers
+    cols are subgects
+    :param how: can be hamming or jaccard or a function that will except 4 parmeters a,b,c,d and return distance.
+        # a is the number of features where the values of i and j are both 1 (or presence), meaning ‘positive matches’,
+        # b is the number of attributes where the value of i and j is (0,1), meaning ‘ i absence mismatches’,
+        # c is the number of attributes where the value of i and j is (1,0), meaning ‘j absence mismatches’,
+        # d is the number of attributes where both i and j have 0 (or absence), meaning ‘negative matches’
+    :param diagonal_value: what will be the diagonal value 0 or 1 mostly. for hamming is zero for jaccard is 1. represent what value to give to tow exactly the same binnarry vector.
+    :return: distance matrix
+    """
+
+    if how == "hamming":
+        diagonal_value = 0
+
+    def dist(arr1, arr2):
+        """
+        http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.352.6123&rep=rep1&type=pdf
+        the artical of binarry distance
+        :param arr1: <class 'numpy.ndarray'>
+        :param arr2: <class 'numpy.ndarray'>
+        have to be same len
+        :return:
+        """
+        assert len(arr1) == len(arr2)
+        a = 0  # a is the number of features where the values of i and j are both 1 (or presence), meaning ‘positive matches’,
+        b = 0 # b is the number of attributes where the value of i and j is (0,1), meaning ‘ i absence mismatches’,
+        c = 0 # c is the number of attributes where the value of i and j is (1,0), meaning ‘j absence mismatches’,
+        d = 0 # d is the number of attributes where both i and j have 0 (or absence), meaning ‘negative matches’
+        for i in range(len(arr1)):
+            if arr1[i] == arr1[i] == 1:
+                a += 1
+            if arr1[i] == 0 and arr2[i] == 1:
+                b += 1
+            if arr1[i] == 1 and arr2[i] == 0:
+                c += 1
+            if arr1[i] == arr1[i] == 0:
+                d += 1
+
+        if how == "hamming":
+            return b+c
+        elif how == "jaccard":
+            return a/(a+b+c)
+        else:
+            return how(a,b,c,d)
+    corr = numeric_dataframe.corr(method=dist)
+
+    np.fill_diagonal(corr.values, diagonal_value)
+    return corr
