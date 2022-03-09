@@ -544,3 +544,19 @@ def get_ordered_unique_vals_from_list(mylist):
     used = set()
     uniq = [x for x in mylist if x not in used and (used.add(x) or True)]
     return uniq
+
+def read_excel(path, sheet=0, indexCol=None):
+    """
+    @param path: str. path of file to be read.
+    @param sheet: str or int. sheet to be exported. Default: 0 (first sheet)
+    @param indexCol: str. name (string) of the column to be defined as index
+    @return: imported pd.DataFrame
+    """
+    try:
+        df = pd.read_excel(path, sheet_name=sheet, index_col=indexCol)
+    except:
+        try:
+            df = pd.read_excel(path, sheet_name=sheet, index_col=indexCol, engine='openpyxl')
+        except:
+            df = pd.read_excel(path, sheet_name=sheet, index_col=indexCol, engine='xlrd')
+    return df

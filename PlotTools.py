@@ -26,7 +26,7 @@ from mpl_toolkits.axes_grid1 import AxesGrid
 from scipy.stats import spearmanr
 # from pandas.tools.plotting import parallel_coordinates
 from pandas.plotting import parallel_coordinates
-
+import scipy.stats as stats
 
 #### ----------------------------------- Figure Drawing ------------------------------------- ###
 
@@ -42,9 +42,15 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                  linewidth=0, stripplot_palette=None,
                  palette=None, order=None, xy_title_fontsize=14,
                  boxplot_color=None,
+
                  add_mean=False,
                  mean_marker='_', mean_color='red',
                  mean_size=100, mean_linewidth=3, mean_alpha=1,
+
+                 add_gmean=False,
+                 gmean_marker='_', gmean_color='blue',
+                 gmean_size=100, gmean_linewidth=3, gmean_alpha=1,
+
                  hide_indices_in_stripplot=None,
                  horizontal=False):
     # * hide_indices_in_stripplot - don't plot specific values in stripplot
@@ -125,6 +131,15 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
 
                 ax.scatter(i, mean, s=mean_size, linewidth=mean_linewidth,
                            c=mean_color, marker=mean_marker, alpha=mean_alpha,
+                           zorder=10)
+
+        if add_gmean: # currently only work if Hue=None # TODO
+            for i, label in enumerate(order):
+                gmean = data.loc[data[DataTools.get_col_name(seriesX)] == label,
+                                DataTools.get_col_name(seriesY)].apply(stats.gmean)
+
+                ax.scatter(i, gmean, s=gmean_size, linewidth=gmean_linewidth,
+                           c=gmean_color, marker=gmean_marker, alpha=gmean_alpha,
                            zorder=10)
 
 
@@ -581,6 +596,7 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
             print("Could not perform line: \nax.collections[0].colorbar.tick_params(axis=u'both', which=u'both', length=0) \nin LielTools_v3\PlotTools.py")
 
     plt.tight_layout()
+    ax.set_ylim(len(numbersTable)+0.5, -1)
 
     return ax
 
@@ -1677,6 +1693,9 @@ def add_horizontal_line_to_ax(height, ax, start_x, end_x,
     :return:
     """
 
+    final_start_xticklabel = start_xticklabel
+    final_end_xticklabel = end_xticklabel
+
     if start_x is None and end_x is None:
         if start_xticklabel is None and end_xticklabel is None:
             raise Exception('if start_x is None and end_x is None, must define start_xticklabel and end_xticklabel.')
@@ -1684,8 +1703,10 @@ def add_horizontal_line_to_ax(height, ax, start_x, end_x,
             for tick, ticklabel in zip(ax.get_xticks(), ax.get_xticklabels()):
                 if ticklabel.get_text() == str(start_xticklabel):
                     start_x = tick
+                    final_start_xticklabel = ticklabel
                 if ticklabel.get_text() == str(end_xticklabel):
                     end_x = tick
+                    final_end_xticklabel = ticklabel
 
     # if couldn't find start_xticklabel
     if start_x is None:
@@ -1693,8 +1714,9 @@ def add_horizontal_line_to_ax(height, ax, start_x, end_x,
             for tick, ticklabel in zip(ax.get_xticks(), ax.get_xticklabels()):
                 if float(ticklabel.get_text()) >= float(start_xticklabel):
                     start_x = tick
+                    final_start_xticklabel = ticklabel
                     print(f'Couldnt find start_xticklabel in labels: {start_xticklabel}'
-                          f'\nUsing {ticklabel.get_text()} instead.')
+                          f'\nUsing {final_start_xticklabel.get_text()} instead.')
                     break
 
         else:
@@ -1705,8 +1727,9 @@ def add_horizontal_line_to_ax(height, ax, start_x, end_x,
             for tick, ticklabel in zip(ax.get_xticks()[::-1], ax.get_xticklabels()[::-1]):
                 if float(ticklabel.get_text()) <= float(end_xticklabel):
                     end_x = tick
+                    final_end_xticklabel = ticklabel
                     print(f'Couldnt find end_xticklabel in labels: {end_xticklabel}'
-                          f'\nUsing {ticklabel.get_text()} instead.')
+                          f'\nUsing {final_end_xticklabel.get_text()} instead.')
                     break
         else:
             raise Exception('Couldnt find end_xticklabel in labels:', end_xticklabel)
@@ -1718,8 +1741,10 @@ def add_horizontal_line_to_ax(height, ax, start_x, end_x,
         raise Exception('Could not find proper end_x, please check why')
 
     if start_x >= end_x:
-        raise Exception('Could not find proper start_x and end_x. Found:\n'
-                        'start_x:', start_x, 'and end_x:', end_x)
+        raise Exception('Could not find proper start_x and end_x. Got:\n'
+                        'start_x:', start_x, 'and end_x:', end_x, '\n',
+                        'final_start_xticklabel:', final_start_xticklabel.get_text(),
+                        'and final_end_xticklabel:', final_end_xticklabel.get_text())
 
     sns.lineplot(y=[height, height], x=[start_x-line_left_offset, end_x+line_right_offset],
                  ax=ax, color=color, linewidth=2)

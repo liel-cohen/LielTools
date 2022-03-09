@@ -51,12 +51,10 @@ def read_txt_to_strings_list(path):
 
 # former readExcel
 def read_excel(path, sheet=0, indexCol=None):
-    ''' indexCol - name (string) of the column to be defined as index '''
-    data = pd.read_excel(path, sheet_name=sheet, index_col=indexCol)
-    if len(data.index) != len(data.index.unique()):
-        print('Warning: DF index not unique!')
-
-    return data
+    """
+    I moved this function to DataTools. See DataTools.read_excel.
+    """
+    return DataTools.read_excel(path, sheet=sheet, indexCol=indexCol)
 
 # former createFolder
 def create_folder(path):
