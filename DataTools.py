@@ -575,21 +575,24 @@ def distance_between_tow_clusters(cluster1,cluster2,pdist_metric="jaccard",diful
             raise ValueError("can't be a partly overlap between clusters")
 
     contact_clusters = pd.concat([cluster1,cluster2])
-    distance_metrix = make_dist_df(contact_clusters.T)
+    distance_metrix = make_dist_df(contact_clusters.T,pdist_metric,difult_identicle_clusters)
     #distance_metrix = pd.DataFrame(squareform(pdist(contact_clusters,metric = pdist_metric)),index=contact_clusters.index,columns=contact_clusters.index)
 
     return {"mean_distance": flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).mean(axis=1)[0],
             "max_distance" : flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).max(axis=1)[0],
             "min_distance" : flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).min(axis=1)[0],
             "median_distance": flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).median(axis=1)[0],
-            "std_median": flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).std(axis=1)[0]}
+            "std_median": flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).std(axis=1)[0],
+            "cluster1":cluster1,
+            "cluster2":cluster2,
+            "distance_metrix":distance_metrix}
 
 def flat_df_to_sereis(df):
     v = df.unstack().to_frame().sort_index(level=1).T
     v.columns = v.columns.map('_'.join)
     return v
 
-def make_dist_df(numeric_dataframe,how="jaccard",diagonal_value = 1):
+def make_dist_df(binary_dataframe,how="jaccard",diagonal_value = 1):
     """
     http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.352.6123&rep=rep1&type=pdf
     the artical of binarry distance
@@ -623,13 +626,13 @@ def make_dist_df(numeric_dataframe,how="jaccard",diagonal_value = 1):
         c = 0 # c is the number of attributes where the value of i and j is (1,0), meaning ‘j absence mismatches’,
         d = 0 # d is the number of attributes where both i and j have 0 (or absence), meaning ‘negative matches’
         for i in range(len(arr1)):
-            if arr1[i] == arr1[i] == 1:
+            if arr1[i] == arr2[i] == 1:
                 a += 1
             if arr1[i] == 0 and arr2[i] == 1:
                 b += 1
             if arr1[i] == 1 and arr2[i] == 0:
                 c += 1
-            if arr1[i] == arr1[i] == 0:
+            if arr1[i] == arr2[i] == 0:
                 d += 1
 
         if how == "hamming":
@@ -638,7 +641,7 @@ def make_dist_df(numeric_dataframe,how="jaccard",diagonal_value = 1):
             return a/(a+b+c)
         else:
             return how(a,b,c,d)
-    corr = numeric_dataframe.corr(method=dist)
+    corr = binary_dataframe.corr(method=dist)
 
     np.fill_diagonal(corr.values, diagonal_value)
     return corr
