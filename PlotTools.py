@@ -57,6 +57,7 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
     # (not all given indices must be contained in df.index)
 
     sns.set(font_scale=font_scale)
+    sns.set_context(font_scale=font_scale)
     sns.set_style(snsStyle)
 
     if stripplot:
@@ -301,7 +302,9 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
                     names_frame_color='black', names_frame_width=4,
 
                     xticklabels='auto', yticklabels='auto',
-                    hide_ticks=False):
+                    hide_ticks=False,
+
+                    fix_smaller_rows_at_y_edges_bug=False):
     """
 
     :param numbersTable:
@@ -369,6 +372,10 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
     :param row_names_to_frame: list of names of rows to draw frame over.
     :param names_frame_color: color of frame to draw over cols/rows
     :param names_frame_width: width of frame to draw over cols/rows
+
+    :param fix_smaller_rows_at_y_edges_bug: some matplotlib versions have a bug where
+                    they cut the first and last rows of the matrix in the heatmap.
+                    This flag set to True should fix it.
     :return: grid object
     """
     sns.set(font_scale=font_scale)
@@ -541,6 +548,10 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
     if col_colors is not None:
         grid.ax_col_colors.tick_params(left=False, bottom=False, top=False, right=False)
 
+    if fix_smaller_rows_at_y_edges_bug:
+        grid.ax_heatmap.set_ylim(len(numbersTable)+0.5, -1)
+        grid.ax_row_colors.set_ylim(len(numbersTable)+0.5, -1)
+
     # get colormap bounds (x pos, y pos, x size, y size)
     # grid.ax_heatmap.get_position().bounds
 
@@ -558,8 +569,10 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
                  mask=None, colorbar_ticks=None,
                  hide_colorbar=False,
                  xy_labels_fontsize=None,
-                 grid_linewidths=0, grid_linecolor='white'):
+                 grid_linewidths=0, grid_linecolor='white',
+                 fix_smaller_rows_at_y_edges_bug=False):
     sns.set(font_scale=font_scale)
+    sns.set_context(font_scale=font_scale)
     sns.set_style(snsStyle)
 
     if ax is None:
@@ -596,7 +609,8 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
             print("Could not perform line: \nax.collections[0].colorbar.tick_params(axis=u'both', which=u'both', length=0) \nin LielTools_v3\PlotTools.py")
 
     plt.tight_layout()
-    ax.set_ylim(len(numbersTable)+0.5, -1)
+    if fix_smaller_rows_at_y_edges_bug:
+        ax.set_ylim(len(numbersTable)+0.5, -1)
 
     return ax
 
@@ -713,7 +727,7 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
                         dot_color='grey', violin_alpha=0.8,
                         stripplot_alpha=0.3, boxplot_width=0.3,
                         dots_x_offset=0.002, order=None, x_rotation=0,
-                        xy_title_fontsize=12, font_scale=1):
+                        xy_title_fontsize=12, font_scale=1, violin_cut=2):
     """
     Plot a violin plot with a boxplot and stripplot on top.
 
@@ -741,6 +755,10 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
     :param xy_title_fontsize: x and y axis titles fontsize (default is None,
                               then uses seaborn automaticaly chosen size)
     :param font_scale: seaborn fontscale
+    :param violin_cut: sns.violinplot parameter: Distance, in units of bandwidth size, to extend the
+                                          density past the extreme datapoints.
+                                          Set to 0 to limit the violin range within the range
+                                          of the observed data
     :return: axes object
     """
     plt.close('all')
@@ -753,7 +771,7 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
     ax = sns.violinplot(y=y, x=x, data=df,
                         palette=palette,
                         scale="width", inner=None,
-                        order=order)
+                        order=order, cut=violin_cut)
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
 
@@ -1158,7 +1176,7 @@ def spaghetti_patients(patientDf, classColumn=None, figsize=(6, 8),
     # define colors iterator
     if classColumn is None: # each row gets a different color
         colors_rows = get_colors_list(patientDf.shape[0],
-                                      shuffle=shuffle_colors, cmap=cmap)
+                                      shuffle=shuffle_colors)
         color = colors_rows['colors']
         colorIter = colors_rows['iter']
     else:                     # color by "classColumn"
@@ -1205,11 +1223,12 @@ def plot_scatter_hue(series_x, series_y, series_hue=None,
                      titleFontSize=18, title_color='maroon',
                      hue_legend_title='', xticks=None, font_scale=1,
                      sns_style="ticks", legend_frame=False,
-                     hue_colorscale=False,
-                     hue_palette='Reds',
+                     hue_colorscale=False, hue_palette='Reds',
                      marker_size=5,
                      marker_linewidth=0, marker_edgecolor='black',
-                     marker_alpha=1):
+                     marker_alpha=1,
+                     x_log_scale=False, y_log_scale=False,
+                     ylim=None, xlim=None):
     sns.set(font_scale=font_scale)
     sns.set_style(sns_style)
 
@@ -1221,7 +1240,6 @@ def plot_scatter_hue(series_x, series_y, series_hue=None,
         y_title = DataTools.get_col_name(series_y)
     if hue_legend_title== '' and series_hue is not None:
         hue_legend_title = DataTools.get_col_name(series_hue)
-
 
     if series_hue is not None: # hue exists
         fig11 = sns.lmplot(DataTools.get_col_name(series_x),
@@ -1259,6 +1277,16 @@ def plot_scatter_hue(series_x, series_y, series_hue=None,
         cbar = fig11.axes[0,0].figure.colorbar(sm)
         cbar.set_label(hue_legend_title)
 
+    if x_log_scale:
+        fig11.set(xscale="log")
+    if y_log_scale:
+        fig11.set(yscale="log")
+
+    if ylim is not None:
+        fig11.set(ylim=ylim)
+    if xlim is not None:
+        fig11.set(xlim=xlim)
+
     plt.xlabel(x_title)
     plt.ylabel(y_title)
 
@@ -1287,10 +1315,10 @@ def plot_scatter(x_series, y_series,
                  title_color='maroon', xticks=None,
                  axes_title_font_size=14,
                  x_jitter=None, y_jitter=None,
-                 ylim=None,
+                 ylim=None, xlim=None,
                  correl_text_x_loc=0.2, correl_text_y_loc=0.96,
                  save_folder=None, save_full_path=None,
-                 ):
+                 x_log_scale=False, y_log_scale=False):
     """
 
     @param x_series: pd.Series. x values series.
@@ -1317,6 +1345,7 @@ def plot_scatter(x_series, y_series,
     @param x_jitter: boolean. Whether to add jitter to x values (relevant if they are integers). Default False
     @param y_jitter: boolean. Whether to add jitter to y values (relevant if they are integers). Default False
     @param ylim: tuple (length 2) with numbers indicating y axis limits, instead of the automatically set ones. Default None
+    @param xlim: tuple (length 2) with numbers indicating x axis limits, instead of the automatically set ones. Default None
     @param correl_text_x_loc: Float. Starting position of the correlation text in the x axis. Default 0.2
     @param correl_text_y_loc: Float. Starting position of the correlation text in the y axis. Default 0.96
     @param save_folder: str. Folder to save the figure (file name determined automatically). Default None
@@ -1349,13 +1378,22 @@ def plot_scatter(x_series, y_series,
                            text_y_loc=correl_text_y_loc)
     fig11.figure.set_size_inches(figsize)
     if xticks is not None: fig11.set(xticks=xticks)
+
+    if x_log_scale:
+        fig11.set(xscale="log")
+    if y_log_scale:
+        fig11.set(yscale="log")
+
     fig11.set_xlabel(x_title, fontdict={'size': axes_title_font_size})
     fig11.set_ylabel(y_title, fontdict={'size': axes_title_font_size})
     fig11.set_title(plot_title, fontdict=fontTitle)
     plt.xticks(rotation=x_rotation)
 
     # fig11.figure.subplots_adjust(right=0.2, bottom=0.2)
-    if ylim is not None: plt.ylim(ylim)
+    if ylim is not None:
+        plt.ylim(ylim)
+    if xlim is not None:
+        plt.xlim(xlim)
     # plt.rc('xtick', labelsize=axesTicksFontSize)  # fontsize of the tick labels
     # plt.rc('ytick', labelsize=axesTicksFontSize)  # fontsize of the tick labels
     # plt.rc('figure', titlesize=titleFontSize)  # fontsize of the figure title

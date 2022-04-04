@@ -54,7 +54,7 @@ def read_excel(path, sheet=0, indexCol=None):
     """
     I moved this function to DataTools. See DataTools.read_excel.
     """
-    return DataTools.read_excel(path, sheet=sheet, indexCol=indexCol)
+    return DataTools.read_excel(path, sheet=sheet, index_col=indexCol)
 
 # former createFolder
 def create_folder(path):
