@@ -1567,7 +1567,8 @@ def plot_columns_dist(df, output_file_path, fig_rows=4, fig_cols=5, figsize=(30,
                              rug_kws={"color": rug_color},
                              hist_kws={"color": hist_color, "alpha": hist_alpha},
                              )
-                for tick in axes[row, col].get_xticklabels(): tick.set_rotation(45)
+                for tick in axes[row, col].get_xticklabels():
+                    tick.set_rotation(45)
                 i = i + 1
 
     fig.suptitle(title, fontsize=title_fontsize, y=title_y)
