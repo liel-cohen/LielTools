@@ -51,6 +51,9 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                  gmean_marker='_', gmean_color='blue',
                  gmean_size=100, gmean_linewidth=3, gmean_alpha=1,
 
+                 color_indices=None, color_indices_color='red', color_indices_size=20,
+                 color_indices_linewidth=0, color_indices_alpha=1, color_indices_marker='o',
+
                  hide_indices_in_stripplot=None,
                  horizontal=False):
     # * hide_indices_in_stripplot - don't plot specific values in stripplot
@@ -60,6 +63,14 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
     sns.set_context(font_scale=font_scale)
     sns.set_style(snsStyle)
 
+    if color_indices is not None:
+        if hide_indices_in_stripplot is None:
+            hide_indices_in_stripplot = color_indices
+        else:
+            for ind in color_indices:
+                if ind not in hide_indices_in_stripplot:
+                    hide_indices_in_stripplot.append(ind)
+
     if stripplot:
         if stripplot_color is None and stripplot_palette is None:
             if palette is not None:
@@ -68,7 +79,6 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                 stripplot_color = boxplot_color
             else:
                 stripplot_color = 'black'
-
 
     data = DataTools.join_non_empty_series_f_list([seriesX, seriesY, seriesHue])
 
@@ -143,6 +153,23 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                            c=gmean_color, marker=gmean_marker, alpha=gmean_alpha,
                            zorder=10)
 
+    if stripplot:
+        if color_indices is not None:
+            for ind_to_color in color_indices:
+                xticklabel_found = False
+                for i, xticklabel in enumerate(ax.get_xticklabels()):
+                    xticklabel_text = xticklabel.get_text()
+
+                    # color marker
+                    if str(data.loc[ind_to_color, DataTools.get_col_name(seriesX)]) == xticklabel_text:
+                        xticklabel_found = True
+                        ax.scatter(i+(2*jitter*(random.random()-0.5)), data.loc[ind_to_color, DataTools.get_col_name(seriesY)],
+                                   s=color_indices_size, linewidth=color_indices_linewidth,
+                                   c=color_indices_color, marker=color_indices_marker, alpha=color_indices_alpha,
+                                   zorder=10)
+
+                if xticklabel_found is False:
+                    raise Exception(f'Did not find an xticklabel_text that matches index {ind_to_color}! Please check why.')
 
     ax.set_title(plotTitle, fontdict=fontTitle)
     for tick in ax.get_xticklabels():
