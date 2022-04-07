@@ -40,7 +40,7 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                  font_scale=1, snsStyle='ticks', boxTransparency=0.6, jitter=0.15,
                  stripplot_alpha=0.7, stripplot_size=4, stripplot_color=None,
                  linewidth=0, stripplot_palette=None,
-                 palette=None, order=None, xy_title_fontsize=14,
+                 palette=None, order=None, xy_title_fontsize=None,
                  boxplot_color=None,
 
                  add_mean=False,
@@ -152,8 +152,9 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
     if (yTitle != None):
         ax.set_ylabel(yTitle)
 
-    ax.yaxis.label.set_size(fontsize=xy_title_fontsize)
-    ax.xaxis.label.set_size(fontsize=xy_title_fontsize)
+    if xy_title_fontsize is not None:
+        ax.yaxis.label.set_size(fontsize=xy_title_fontsize)
+        ax.xaxis.label.set_size(fontsize=xy_title_fontsize)
 
     if seriesHue is not None:
         # Get the handles and labels.
@@ -173,8 +174,10 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                    frameon=False, title=legendTitle)
 
         # if legend is binary, change 0,1 to no,yes
-        legText = ax.get_legend().get_texts()
-        legText = bin_text_to_yes_no(legText)
+        leg = ax.get_legend()
+        if leg is not None:
+            legText = leg.get_texts()
+            legText = bin_text_to_yes_no(legText)
 
     # if X is binary, change 0,1 to no,yes
     xticksText = ax.get_xticklabels()
@@ -236,10 +239,14 @@ def plot_boxplot_df(df, stripplot=True, saveFolder=None, figsize=(7, 6),
                         color=color_stripplot)
 
     ax.set_title(plotTitle, fontdict=fontTitle)
-    for tick in ax.get_xticklabels(): tick.set_rotation(xRotation)
-    if xTitle is not None: ax.set_xlabel(xTitle)
-    if yTitle is not None: ax.set_ylabel(yTitle)
-    if ylim is not None: ax.set_ylim(ylim)
+    for tick in ax.get_xticklabels():
+        tick.set_rotation(xRotation)
+    if xTitle is not None:
+        ax.set_xlabel(xTitle)
+    if yTitle is not None:
+        ax.set_ylabel(yTitle)
+    if ylim is not None:
+        ax.set_ylim(ylim)
 
     # if X is binary, change 0,1 to no,yes
     xticksText = ax.get_xticklabels()
@@ -251,7 +258,6 @@ def plot_boxplot_df(df, stripplot=True, saveFolder=None, figsize=(7, 6),
             ax.scatter(i, df[col].mean(), s=mean_size, linewidth=mean_linewidth,
                        c=mean_color, marker=mean_marker, alpha=mean_alpha,
                        zorder=10)
-
 
     plt.tight_layout()
     if saveFolder is not None:
@@ -273,7 +279,8 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
                     mask=None,
 
                     cbar_title='', cbar_orient='vertical',
-                    cbar_pos=None, cbar_vertical_left=False,
+                    cbar_pos=None,
+                    cbar_vertical_left=False, cbar_vertical_left_x_factor=3/5,
                     cbar_title_fontsize=None, cbar_ticks_fontsize=None,
                     hide_cbar=False,
 
@@ -338,6 +345,8 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
     :param cbar_pos: colorbar position
     :param cbar_vertical_left: bool. If True, sets cbar vertically to the left
                                of the entire heatmap (ignoring cbar_pos)
+    :param cbar_vertical_left_x_factor: float between 0 and 1. A factor that determines the
+            x axis right limit of the cbar. The smaller the value is, the thinner the cbar will be.
     :param hide_cbar: hide colormap (True / False)
     :param linewidths: heatmap grid width
     :param linecolor: heatmap grid color
@@ -372,6 +381,10 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
     :param row_names_to_frame: list of names of rows to draw frame over.
     :param names_frame_color: color of frame to draw over cols/rows
     :param names_frame_width: width of frame to draw over cols/rows
+
+    :param xticklabels: labels for x ticks. either 'auto' or a list of tick-labels (strings) or an empty list for no tick-labels at all.
+    :param yticklabels: labels for y ticks. either 'auto' or a list of tick-labels (strings) or an empty list for no tick-labels at all.
+    :param hide_ticks: boolean. hide the little tickmarks next to the tick labels.
 
     :param fix_smaller_rows_at_y_edges_bug: some matplotlib versions have a bug where
                     they cut the first and last rows of the matrix in the heatmap.
@@ -442,6 +455,10 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
                           yticklabels=yticklabels, xticklabels=xticklabels,
                           )
 
+    if fix_smaller_rows_at_y_edges_bug:
+        grid.ax_heatmap.set_ylim(len(numbersTable)+0.5, -1)
+        grid.ax_row_colors.set_ylim(len(numbersTable)+0.5, -1)
+
     # Add plot title
     if title != '':
         if col_color_lab_legend or row_color_lab_legend and title_y_padding==0:
@@ -468,7 +485,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
         heatmap_start_y = grid.ax_heatmap.get_position().get_points()[0,1]
         heatmap_end_y = grid.ax_heatmap.get_position().get_points()[1,1]
         cbar_pos = [heatmap_start_x/4, heatmap_start_y, # [left, bottom, width, height]
-                    3*heatmap_start_x/5 , heatmap_end_y-heatmap_start_y]
+                    heatmap_start_x*cbar_vertical_left_x_factor , heatmap_end_y-heatmap_start_y]
 
     if cbar_pos is not None:
         grid.cax.set_position(cbar_pos)
@@ -548,9 +565,6 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
     if col_colors is not None:
         grid.ax_col_colors.tick_params(left=False, bottom=False, top=False, right=False)
 
-    if fix_smaller_rows_at_y_edges_bug:
-        grid.ax_heatmap.set_ylim(len(numbersTable)+0.5, -1)
-        grid.ax_row_colors.set_ylim(len(numbersTable)+0.5, -1)
 
     # get colormap bounds (x pos, y pos, x size, y size)
     # grid.ax_heatmap.get_position().bounds
@@ -922,200 +936,6 @@ def plotSeriesHistogram(numericSeries, useAxes=None, color='green', grid=False):
 
     return(useAxes)
 
-# '''Gets a correlation matrix and a pvalues matrix (without multiplicity adjustment)
-# starsCol, censorCol can be 'FWER', 'FDR' or 'pvals' (i.e., without multiplicity adjustment) '''
-# def plotCorrelMat(correlOrig, pvalsOrig, showSig=True, savePath=None,
-#                   starsCol='FWER',
-#                   censorCol='FDR',
-#                   censorThresh=1, only_lower_triangle=False,
-#                   figuresize=(6, 4.5), scaleLabel='Correlation',
-#                   asterSize=10, axesTicksFontSize=16, legendFontSize_title=16, legendFontSize_ticks=14,
-#                   main_left=0.3, main_bottom=0.22, main_right=0.98, main_top=0.99,
-#                   color_left=0.01, color_bottom=0.66, color_right=0.04, color_top=0.95,
-#                   asterisks_x=0.65, asterisks_y=0.5, numbers_upper=True, numbers_size=13,
-#                   edgecolors='white', linewidths=0, shading='flat',
-#                   label_category=None, label_cmap=None):
-#     vals = correlOrig.copy()
-#     pvals = pvalsOrig.copy()
-#
-#     if (showSig == True):
-#         adjPvals = {'FWER': StatsTools.multipAdjustPvalsMat(pvals, method='FWER', corrMat=True),
-#                     'FDR': StatsTools.multipAdjustPvalsMat(pvals, method='FDR', corrMat=True),
-#                     'pvals': pvals}
-#
-#         # fill NA pvals values in the data
-#         adjPvals['FWER'] = adjPvals['FWER'].fillna(1)
-#         adjPvals['FDR'] = adjPvals['FDR'].fillna(1)
-#         adjPvals['pvals'] = adjPvals['pvals'].fillna(1)
-#         vals = vals.fillna(0)
-#
-#         # censor
-#         censorInd = adjPvals[censorCol] > censorThresh  # cells to censor
-#         adjPvals['FWER'].values[censorInd] = 1.
-#         adjPvals['FDR'].values[censorInd] = 1.
-#         adjPvals['pvals'].values[censorInd] = 1.
-#         vals[censorInd] = 0.
-#
-#         # pvals to plot
-#         pValsToStar = adjPvals[starsCol]
-#
-#     # vals and pvals to plot
-#     valsToPlot = vals
-#
-#     valsToPlot_orig = valsToPlot.copy()
-#     if only_lower_triangle:
-#         for i in range(valsToPlot.shape[0]):
-#             for j in range(i):
-#                 valsToPlot.iloc[j, i] = np.nan
-#                 if showSig:
-#                     pValsToStar.iloc[j, i] = np.nan
-#
-#     # plot parameters
-#     cmap = cm.get_cmap('RdBu_r')
-#     pcParams = dict(vmin=-1.0, vmax=1.0, cmap=cmap, edgecolors=edgecolors,
-#                     linewidths=linewidths, shading=shading)
-#     scaleLabel = scaleLabel
-#     ytl = np.array([-1.0, -0.5, 0, 0.5, 1.0])
-#     yt = np.array([-1.0, -0.5, 0, 0.5, 1.0])
-#
-#     # main plot
-#     plt.figure(figsize=figuresize)
-#     figh = plt.gcf()
-#     plt.clf()
-#     axh = figh.add_subplot(plt.GridSpec(1, 1, left=main_left, bottom=main_bottom,
-#                                         right=main_right, top=main_top)[0, 0])
-#     axh.grid(None)
-#     pcolOut = plt.pcolormesh(valsToPlot, **pcParams)
-#     plt.yticks(())  # empty y tick labels (rows)
-#     # plt.xticks(np.arange(valsToPlot.shape[1]) + 0.5, valsToPlot.columns, size=11, rotation=90) # first - x locations, second - x labels = col names
-#     plt.xticks(())  # empty x tick labels (columns)
-#     axh.xaxis.set_ticks_position('top')
-#     plt.xlim((0, valsToPlot.shape[1]))
-#     plt.ylim((0, valsToPlot.shape[0]))
-#     axh.invert_yaxis()
-#     # plt.box(on=None)  # remove the frame border
-#     # spineColor = '#d9d9d9'
-#     spineColor = 'black'
-#
-#     if only_lower_triangle:
-#         axh.spines['right'].set_visible(False)
-#         axh.spines['top'].set_visible(False)
-#     else:
-#         axh.spines['right'].set_color(spineColor)
-#         axh.spines['right'].set_linewidth('1.5')
-#         axh.spines['top'].set_color(spineColor)
-#         axh.spines['top'].set_linewidth('1.5')
-#     axh.spines['left'].set_color(spineColor)
-#     axh.spines['left'].set_linewidth('1.5')
-#     axh.spines['bottom'].set_color(spineColor)
-#     axh.spines['bottom'].set_linewidth('1.5')
-#
-#     # lines
-#     lineColor = 'black'
-#
-#     if (showSig == True):  # add significance asterisks
-#         for cyi, cy in enumerate(valsToPlot.index):
-#             for outi, out in enumerate(valsToPlot.columns):
-#                 if (cyi != outi) and ((cyi > outi and numbers_upper) or not numbers_upper):
-#                     if pValsToStar.loc[cy, out] < 0.0005:
-#                         ann = '***'
-#                     elif pValsToStar.loc[cy, out] < 0.005:
-#                         ann = '**'
-#                     elif pValsToStar.loc[cy, out] < 0.05:
-#                         ann = '*'
-#                     else:
-#                         ann = ''
-#                     if not ann == '':
-#                         plt.annotate(ann, xy=(outi + asterisks_x, cyi + asterisks_y),
-#                                      weight='bold', size=asterSize, ha='center',
-#                                      va='center', rotation=90)
-#
-#     if numbers_upper:
-#         for cyi, cy in enumerate(valsToPlot.index):
-#             for outi, out in enumerate(valsToPlot.columns):
-#                 if (cyi != outi and cyi < outi):
-#                     if only_lower_triangle:
-#                         upper_text_color = get_value_color_from_cmap(valsToPlot_orig.loc[cy, out],
-#                                                         cmap_name='RdBu_r', vmin=-1, vmax=1)
-#                         do_annotate = True
-#                     else:
-#                         upper_text_color = 'black'
-#                         if showSig:
-#                             do_annotate = pValsToStar.loc[cy, out] < 0.05
-#                         else:
-#                             do_annotate = False
-#
-#                     if do_annotate:
-#                         plt.annotate(np.round(valsToPlot_orig.loc[cy, out], 2),
-#                                      xy=(outi + 0.9*asterisks_x, cyi + 1.1*asterisks_y),
-#                                      size=numbers_size, ha='center',
-#                                      va='center', rotation=0,
-#                                      color=upper_text_color)
-#
-#     # add labels over the rows
-#     if label_category is not None:
-#         row_color_width = 0.035
-#     else:
-#         row_color_width = 0
-#     cbAxh = figh.add_subplot(plt.GridSpec(1, 1,
-#                                           left=main_left-0.012-row_color_width,
-#                                           bottom=main_bottom,
-#                                           right=main_left-0.011-row_color_width,
-#                                           top=main_top)[0, 0])
-#     cbAxh.grid(None)
-#     plt.ylim((0, valsToPlot.shape[0]))
-#     plt.yticks(np.arange(valsToPlot.shape[0]), valsToPlot.index, size=axesTicksFontSize)
-#     plt.xlim((0, 0.5))
-#     plt.ylim((-0.5, valsToPlot.shape[0] - 0.5))
-#     plt.xticks(())
-#     cbAxh.invert_yaxis()
-#     plt.box(on=None)  # remove the frame border
-#     cbAxh.tick_params(axis=u'both', which=u'both', length=0)  # remove the little tick marks
-#
-#     # add labels over the columns
-#     cbAyh = figh.add_subplot(plt.GridSpec(1, 1, left=main_left,
-#                                           bottom=main_bottom-0.01,
-#                                           right=0.98,
-#                                           top=main_bottom-0.00889)[0, 0])
-#     cbAyh.grid(None)
-#     plt.xlim((0, 4 * valsToPlot.shape[0]))
-#     plt.xticks(4 * np.arange(valsToPlot.shape[0]), valsToPlot.index,
-#                size=axesTicksFontSize)
-#     plt.ylim((0, 0.5))
-#     plt.xlim((-2.2, 4 * valsToPlot.shape[0] - 2.0))
-#     plt.yticks(())
-#     # cbAyh.invert_xaxis()
-#     plt.box(on=None)  # remove the frame border
-#     cbAyh.tick_params(axis=u'both', which=u'both', length=0)  # remove the little tick marks
-#     plt.xticks(rotation=90)
-#
-#     # scale colorbar
-#     scaleAxh = figh.add_subplot(plt.GridSpec(1, 1, left=color_left,
-#                                              bottom=color_bottom,
-#                                              right=color_right,
-#                                              top=color_top)[0, 0])
-#     cb = figh.colorbar(pcolOut, cax=scaleAxh, ticks=yt)
-#     cb.set_label(scaleLabel, size=legendFontSize_title)
-#     cb.ax.set_yticklabels(ytl, fontsize=legendFontSize_ticks)
-#     plt.tick_params(axis=u'both', which=u'both', length=0)  # remove the little tick marks
-#     cb.outline.set_edgecolor(lineColor)
-#     # cb.outline.set_linewidth(1.5)
-#
-#     # add row colors
-#     if label_category is not None:
-#         row_color_ax = figh.add_subplot(GridSpec(1, 1, left=main_left - 0.04,
-#                                                  bottom=main_bottom,
-#                                                  right=main_left - 0.005,
-#                                                  top=main_top)[0, 0])
-#         row_colors_map = mapColors2Labels(label_category, cmap=label_cmap)
-#         row_color_ax.imshow([[x] for x in row_colors_map.values],
-#                             interpolation='nearest', aspect='auto',
-#                             origin='upper')
-#         clean_axis(row_color_ax)
-#
-#     plt.tight_layout()
-#
-#     save_plt(save_path=savePath)
 
 def plot_barplot_from_series(counts, figsize=(18, 8), title='',  ylabel='',
                              xrotation=90, annot=True, annot_format="{:.1f}",
@@ -1217,13 +1037,13 @@ def spaghetti_patients(patientDf, classColumn=None, figsize=(6, 8),
 # former plotScatterHue
 def plot_scatter_hue(series_x, series_y, series_hue=None,
                      save_folder=None, save_full_path=None,
-                     aspect_ratio=1.2,
+                     aspect_ratio=1.2, size=7,
                      show_reg_line=False, plot_title='',
                      x_title='', y_title='', x_rotation=45,
                      titleFontSize=18, title_color='maroon',
                      hue_legend_title='', xticks=None, font_scale=1,
                      sns_style="ticks", legend_frame=False,
-                     hue_colorscale=False, hue_palette='Reds',
+                     hue_colorscale=False, hue_palette='Set2',
                      marker_size=5,
                      marker_linewidth=0, marker_edgecolor='black',
                      marker_alpha=1,
@@ -1245,14 +1065,15 @@ def plot_scatter_hue(series_x, series_y, series_hue=None,
         fig11 = sns.lmplot(DataTools.get_col_name(series_x),
                            DataTools.get_col_name(series_y), data,
                            hue=DataTools.get_col_name(series_hue), fit_reg=show_reg_line,
-                           legend=False, aspect=aspect_ratio, palette=hue_palette,
+                           legend=False, aspect=aspect_ratio, size=size, palette=hue_palette,
                            scatter_kws={'linewidths': marker_linewidth,
                                         'edgecolor': marker_edgecolor,
                                         'alpha': marker_alpha,
-                                        's': marker_size})
+                                        's': marker_size},
+                           )
     else:                     # no hue
         fig11 = sns.lmplot(DataTools.get_col_name(series_x), DataTools.get_col_name(series_y),
-                           data, fit_reg=show_reg_line, legend=False, aspect=aspect_ratio,
+                           data, fit_reg=show_reg_line, legend=False, aspect=aspect_ratio, size=size,
                            scatter_kws={'linewidths': marker_linewidth,
                                         'edgecolor': marker_edgecolor,
                                         'alpha': marker_alpha})
@@ -1550,9 +1371,16 @@ def catergorical_y_with_error(y_categories_series, x_nums_series, x_error_series
     plt.tight_layout()
 
 
-def plot_columns_dist(df, output_file_path, fig_rows=4, fig_cols=5, figsize=(30, 20),
-                      kde_color='black', rug_color='black', hist_color='g', hist_alpha=0.3,
-                      title='', title_fontsize=18, title_y=1.03):
+def plot_columns_dist(df, output_file_path=None, fig_rows=4, fig_cols=5, figsize=(30, 20),
+                      kde_color='black', hist_color='g', hist_alpha=0.3,
+                      title='', title_fontsize=18, title_y=1.03, bins=30,
+                      rug=False, rug_color='black', rug_alpha=0.3,
+                      rug_linewidth=1, rug_height=0.03, font_scale=1,
+                      sns_style='ticks'):
+    sns.set(font_scale=font_scale)
+    sns.set_style(sns_style)
+
+
     num_columns = df.shape[1]
     if fig_cols * fig_rows < num_columns:
         print('plot_columns_dist: number of columns', num_columns, 'is smaller than fig_cols*fig_rows')
@@ -1562,9 +1390,10 @@ def plot_columns_dist(df, output_file_path, fig_rows=4, fig_cols=5, figsize=(30,
     for row in range(fig_rows):
         for col in range(fig_cols):
             if (i < num_columns):
-                sns.distplot(df.iloc[:, i], ax=axes[row, col], rug=True, bins=30,
+                sns.distplot(df.iloc[:, i], ax=axes[row, col], rug=rug, bins=bins,
                              kde_kws={"color": kde_color},
-                             rug_kws={"color": rug_color},
+                             rug_kws={"color": rug_color, "alpha": rug_alpha,
+                                      "linewidth": rug_linewidth, "height": rug_height},
                              hist_kws={"color": hist_color, "alpha": hist_alpha},
                              )
                 for tick in axes[row, col].get_xticklabels():
@@ -1573,17 +1402,28 @@ def plot_columns_dist(df, output_file_path, fig_rows=4, fig_cols=5, figsize=(30,
 
     fig.suptitle(title, fontsize=title_fontsize, y=title_y)
     fig.tight_layout()
-    plt.savefig(output_file_path, bbox_inches='tight')
+
+    if output_file_path is not None:
+        plt.savefig(output_file_path, bbox_inches='tight', dpi=500)
 
 
 def plot_columns_dist_hue(df, hue_col, output_file_path=None, fig_cols=5,
-                          rug=False, hist_alpha=0.5, shade=False,
-                          palette="Set1", rug_color='black'):
+                          hist_alpha=0.5, shade=False, palette="Set1",
+                          sharex=False, sharey=False, font_scale=1.5,
+                          rug=False, rug_color='black', rug_alpha=0.3,
+                          rug_linewidth=1, rug_height=0.03,
+                          fig_height=3, fig_aspect=1, sns_style='ticks'):
+    sns.set(font_scale=font_scale)
+    sns.set_style(sns_style)
+
     df_melted = df.melt(id_vars=hue_col, var_name='cols', value_name='vals')
 
-    g = sns.FacetGrid(df_melted, col='cols', hue=hue_col, palette=palette, col_wrap=fig_cols)
+    g = sns.FacetGrid(df_melted, col='cols', hue=hue_col, palette=palette, col_wrap=fig_cols,
+                      sharex=sharex, sharey=sharey, height=fig_height, aspect=fig_aspect)
     g = (g.map(sns.distplot, "vals", hist=False, rug=rug, kde_kws={"shade": shade},
-               hist_kws={"alpha": hist_alpha}, rug_kws={"color": rug_color}))
+               hist_kws={"alpha": hist_alpha},
+               rug_kws={"color": rug_color, "alpha": rug_alpha,
+                        "linewidth": rug_linewidth, "height": rug_height}))
 
     plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., frameon=False)
 
@@ -1591,15 +1431,66 @@ def plot_columns_dist_hue(df, hue_col, output_file_path=None, fig_cols=5,
         plt.savefig(output_file_path, dpi=500, bbox_inches='tight')
 
 
-def pairplot_with_spearman(df):
-    """ Draw pairplot with annotation of spearman correlation in each subplut"""
+def plot_boxplot_subplots(df, x_col, y_cols, hue_col=None, output_file_path=None, fig_rows=4, fig_cols=5, figsize=(30, 20),
+                          title='', title_fontsize=18, title_y=1.03, font_scale=1, sns_style='ticks',
+                          **boxplot_kwargs):
+    """
+
+    @param df: pd.DataFrame containing the data for the figures.
+    @param x_col: str. The name of the df column to plot in the x axis of all subplots.
+    @param y_cols: list of strings. A list that contains the names of all columns to be plotted from df.
+                   Each column will be plotted in a boxplot of its own (a single subplot).
+    @param hue_col: str. The name of the df column to plot as the hue variable (i.e., sub-categories) of all subplots. Default None.
+    @param output_file_path: str. path for the figure to be saved to file system. Default None.
+    @param fig_rows: int. Number of subplots rows.
+    @param fig_cols: int. Number of subplots columns.
+    @param figsize: tuple with 2 numbers. figure size (of entire figure containing all subplots).
+    @param title: str. figure title
+    @param title_fontsize: int. title text font size.
+    @param title_y:
+    @param font_scale: float. seaborn fontscale.
+    @param sns_style: str. seaborn style.
+    @param boxplot_kwargs: keyword parameters to be passed to plot_boxplot for each of the subplots.
+    @return: matplotlib axes object
+    """
+    plt.close('all')
+    sns.set(font_scale=font_scale)
+    sns.set_style(sns_style)
+
+
+    num_figs = len(y_cols)
+    if fig_cols * fig_rows < num_figs:
+        print('plot_boxplot_subplots: number of columns', num_figs, 'is smaller than fig_cols*fig_rows')
+
+    i = 0
+    fig, axes = plt.subplots(fig_rows, fig_cols, figsize=figsize)
+    for row in range(fig_rows):
+        for col in range(fig_cols):
+            if (i < num_figs):
+                plot_boxplot(df[x_col], df[y_cols[i]],
+                             seriesHue=None if hue_col is None else df[hue_col],
+                             ax=axes[row, col],
+                             **boxplot_kwargs)
+                i = i + 1
+
+    fig.suptitle(title, fontsize=title_fontsize, y=title_y)
+    fig.tight_layout()
+
+    if output_file_path is not None:
+        plt.savefig(output_file_path, bbox_inches='tight', dpi=500)
+
+    return axes
+
+
+def pairplot_with_spearman(df, font_scale=1, spearman_fontsize=10):
+    """ Draw pairplot with annotation of spearman correlation in each subplot"""
     def corrfunc(x, y, ax=None, **kws):
         """Plot the correlation coefficient in the top left hand corner of a plot."""
         r, _ = spearmanr(x, y)
         ax = ax or plt.gca()
-        ax.annotate(f'ρ = {r:.2f}', xy=(.1, 0.9), xycoords=ax.transAxes, fontsize=10)
+        ax.annotate(f'ρ = {r:.2f}', xy=(.1, 0.9), xycoords=ax.transAxes, fontsize=spearman_fontsize, zorder=10)
 
-    sns.set(font_scale=1.5)
+    sns.set(font_scale=font_scale)
     sns.set_style("white")
     g = sns.pairplot(df)
     g.map(corrfunc)
