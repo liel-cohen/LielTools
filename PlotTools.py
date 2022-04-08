@@ -34,13 +34,13 @@ import scipy.stats as stats
 # former plotBoxplot
 def plot_boxplot(seriesX, seriesY, seriesHue=None,
                  stripplot=True, boxplot=True,
-                 saveFolder=None, ax=None,
+                 saveFolder=None, ax=None, palette=None,
                  figsize=(7, 6), showf=False, plotTitle='', xTitle='', yTitle='',
                  xRotation=45, titleFontSize=18, titleColor='maroon', legendTitle='',
                  font_scale=1, snsStyle='ticks', boxTransparency=0.6, jitter=0.15,
                  stripplot_alpha=0.7, stripplot_size=4, stripplot_color=None,
                  linewidth=0, stripplot_palette=None,
-                 palette=None, order=None, xy_title_fontsize=None,
+                 order=None, xy_title_fontsize=None,
                  boxplot_color=None,
 
                  add_mean=False,
@@ -858,6 +858,61 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
     ax.xaxis.label.set_size(fontsize=xy_title_fontsize)
 
     return ax
+
+def plot_boxplot_hue_stats_text(df, x_col_name, y_col_name, hue_col_name,
+                                test='Mann-Whitney', comparisons_correction=None,
+                                stats_loc='inside', stats_line_offset=None, stats_line_height=0.02,
+                                stats_text_offset=1, stats_linewidth=1.5,
+                                stats_fontsize='medium', stats_width=0.8,
+                                **boxplot_kwargs,
+                                ):
+    """
+    Draws a boxplot using the plot_boxplot function. Then, performs statistical test
+    between "hue" col values (must be 2-values only), and adds statistical annotation on top
+    of the boxes.
+
+    @param df: pandas dataframe
+    @param x_col_name: str. name of df column to be plotted on x axis (categorical)
+    @param y_col_name: str. name of df column to be plotted on y axis (numeric)
+    @param hue_col_name: str. name of df column to be plotted as hue. can only contain exactly 2 unique values (categories).
+                              the statistical test will be performed between these two categories, against the y values.
+                              (do the y values differ between the two categories?)
+
+    @params **boxplot_kwargs - keyword arguments passed to the plot_boxplot function.
+
+    statistical annotation parameters:
+    @param test: str. default 'Mann-Whitney'
+        Statistical test to run. Must be one of: `Levene`, `Mann-Whitney`, `Mann-Whitney-gt`, `Mann-Whitney-ls`,
+                                                 `t-test_ind`, `t-test_welch`, `t-test_paired`, `Wilcoxon`, `Kruskal`
+                                                 * The Mann-Whitney U test is the nonparametric equivalent of the two sample t-test
+                                                 * the Mann-Whitney U-test tests two independent samples, whereas the Wilcox sign test tests two dependent samples.
+
+    @param comparisons_correction: Method for multiple comparisons correction. `bonferroni` or None. default None
+    @param stats_loc: 'inside' or 'outside'. Defalt 'inside'
+    @param stats_line_height: in axes fraction coordinates
+    @param stats_text_offset: in points
+    @return: matplotlib axes object
+    """
+    import statannot # pip install git+https://github.com/webermarcolivier/statannot.git
+
+    hue_vals = df[hue_col_name].unique()
+    if len(hue_vals) != 2:
+        raise ValueError(f'column {hue_col_name} can only contain exactly 2 unique values. Please revise.')
+
+    ax = plot_boxplot(df[x_col_name], df[y_col_name], seriesHue=df[hue_col_name],
+                      **boxplot_kwargs)
+
+    statannot.add_stat_annotation(ax, data=df, x=x_col_name, y=y_col_name, hue=hue_col_name,
+                                  box_pairs=[((x_val, hue_vals[0]), (x_val, hue_vals[1])) for x_val in df[x_col_name].unique()],
+                                  test=test, text_format='star', loc=stats_loc, verbose=1,
+                                  comparisons_correction=comparisons_correction,
+                                  width=stats_width, line_offset=stats_line_offset, line_height=stats_line_height,
+                                  text_offset=stats_text_offset, linewidth=stats_linewidth, fontsize=stats_fontsize,
+                                  )
+
+    return ax
+
+
 
 ''' gets counts data column/s and creates a bar plot '''
 def DFbarPlot(data, columns=None,
