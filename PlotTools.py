@@ -578,7 +578,13 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
             if not hide_colorbar:
                 ax.collections[0].colorbar.tick_params(axis=u'both', which=u'both', length=0)
         except Exception:
-            print("Could not perform line: \nax.collections[0].colorbar.tick_params(axis=u'both', which=u'both', length=0) \nin LielTools_v3\PlotTools.py")
+            try:
+                ax.tick_params(axis='both', which='both', length=0)
+            except Exception:
+                print(
+                    "Could not perform line: \nax.collections[0].colorbar.tick_params(axis=u'both', which=u'both', length=0) \nin LielTools_v3\PlotTools.py")
+
+
 
     plt.tight_layout()
 
