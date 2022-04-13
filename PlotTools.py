@@ -1458,7 +1458,7 @@ def plot_columns_dist(df, output_file_path=None, fig_rows=4, fig_cols=5, figsize
                       title='', title_fontsize=18, title_y=1.03, bins=30,
                       rug=False, rug_color='black', rug_alpha=0.3,
                       rug_linewidth=1, rug_height=0.03, font_scale=1,
-                      sns_style='ticks'):
+                      sns_style='ticks', x_rotation=0):
     sns.set(font_scale=font_scale)
     sns.set_style(sns_style)
 
@@ -1479,7 +1479,7 @@ def plot_columns_dist(df, output_file_path=None, fig_rows=4, fig_cols=5, figsize
                              hist_kws={"color": hist_color, "alpha": hist_alpha},
                              )
                 for tick in axes[row, col].get_xticklabels():
-                    tick.set_rotation(45)
+                    tick.set_rotation(x_rotation)
                 i = i + 1
 
     fig.suptitle(title, fontsize=title_fontsize, y=title_y)
