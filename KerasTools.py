@@ -21,7 +21,7 @@ if 'LielTools' in sys.modules:
 else:
     import FileTools
     from DataGenerator import data_generator
-    from LielTools_4.LielTools.RepertoireTools import seqTools as SeqC
+    from LielTools_4.LielTools import seqTools as SeqC
     import PlotTools
 
 
@@ -127,7 +127,7 @@ def getClassWeights(yLabels, returnBalanced=False):
 
 def create_kmer_filters(k, groupLetters, groupEncoder, bias=None):
     # Create all k-mers filters
-    allKmers = SeqC.seqTools.createAllKmersList(k, groupLetters)
+    allKmers = SeqC.seqTools.get_all_possible_kmers(k, groupLetters)
     kmer_filters = SeqC.seqTools.strSeries2_1H(pd.Series(allKmers),
                                                charEncoder=groupEncoder,
                                                padding=False) # we don't want to pad the filters. Each should have length k
