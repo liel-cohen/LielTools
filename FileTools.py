@@ -50,9 +50,9 @@ def read_txt_to_strings_list(path):
     return str_list
 
 # former readExcel
-def read_excel(path, sheet=0, indexCol=None):
+def read_excel(path, sheet=0, indexCol=None,engine=None):
     ''' indexCol - name (string) of the column to be defined as index '''
-    data = pd.read_excel(path, sheet_name=sheet, index_col=indexCol)
+    data = pd.read_excel(path, sheet_name=sheet, index_col=indexCol,engine=engine)
     if len(data.index) != len(data.index.unique()):
         print('Warning: DF index not unique!')
 

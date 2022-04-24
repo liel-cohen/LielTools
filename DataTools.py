@@ -1,3 +1,7 @@
+from copy import copy
+from pickle import TRUE
+from matplotlib.pyplot import copper
+from mysqlx import Column
 import pandas as pd
 import functools
 import math
@@ -7,6 +11,7 @@ import sys
 from collections import Counter
 import random
 from scipy import sparse
+from sklearn.preprocessing import OneHotEncoder
 
 if 'LielTools' in sys.modules:
     from LielTools import FileTools
@@ -544,3 +549,105 @@ def get_ordered_unique_vals_from_list(mylist):
     used = set()
     uniq = [x for x in mylist if x not in used and (used.add(x) or True)]
     return uniq
+
+def convert_CategoricalToBinary(df):
+    '''
+    convert a categorical variable to binary or one hot encoding.
+    we have considered only 4 levels categories.
+    one column is dropped in each categories.
+    i.e if there are 2 levels ,then we drop one column and have only 1 column
+    if there n columns of binary then it is n-1 columns in df.
+    this is to avoid multicolinearity problem.
+    for example if the df has sex with values male and female then,
+    the df after conversion will contain sex_male [0,1], wheere 0 is for male and 
+    1 is for female. The funciton also prints the converted columns and their levels 
+    :param df: pandas dataframe
+    :return:  pandas dataframe- a (copy) of update dataframe 
+    '''
+
+    conversionDict ={}
+    encoded_df = df.copy()
+    #get all the colnames from the dataframe
+    colnames = encoded_df.columns
+    #for each col name check wether the unqiue value is greater than 1 and less than 3
+    # also check the datatype of the variable do the conversion only if it is object type
+    #e.g string 
+    for col in colnames:
+        categories = encoded_df[col].unique()
+        categoriesLen = len(categories)
+        if categoriesLen >= 2  and  categoriesLen < 5 and  encoded_df[col].dtype=="object":
+            #drop one column to avoid multicolinearity 
+            conversionDict[col] = categories
+            dummy_df = pd.get_dummies(encoded_df[col],drop_first=True,prefix=col)
+            #drop the original column 
+            encoded_df = encoded_df.drop(col,axis=1)
+            #concate the df 
+            encoded_df = pd.concat([encoded_df,dummy_df],axis=1)
+
+    #print the columns converted 
+    print("******"*20)
+    for key,value in conversionDict.items():
+        print("Column:%s with categories %s binary converted." % (key,value))
+    print("******"*20)
+    return encoded_df
+
+
+def get_col_names_by_type(df):
+    '''
+    get the column names based on the data type given in the list 
+    e.g ["object","int64"]
+    :param df: pandas dataframe
+    :param type: string - data type . eg. object,int64,float64
+    :return:list-  col names with the matching datatype
+    '''
+    colDtypeDict = {}
+    #get the data type of the columns
+    for col in df.columns:
+        dataTypeCol = df[col].dtype.name
+        if dataTypeCol not in colDtypeDict.keys():
+            colDtypeDict[dataTypeCol] = [col]
+        else:
+            colDtypeDict[dataTypeCol].append(col)
+    return colDtypeDict
+
+
+def drop_columns_with_suffix(df,phrase=""):
+    dataframe = df.copy()
+    tempList = getDF_ColumnNamesWithPhrase(dataframe,phrase)
+    dataframe = dataframe.drop(tempList,axis=1)
+    return dataframe
+
+def get_df_with_cols(df, cols_to_include):
+    """
+    returns a copy of pandas.DataFrame df that contains all
+    columns to be included cols_to_include.
+    *Not all items in cols_to_exclude must be in df.cols.
+
+    :param df: pandas.DataFrame
+    :param cols_to_include: list of columns to include from
+                            returned df
+    :return: a copy of df that contains all columns mentioned in
+              cols_to_include 
+    """
+
+    cols = [col for col in df.columns if col in cols_to_include]
+    return(df[cols].copy())
+
+
+def get_DFs_group_by_colname(df,colname = []):
+    """
+    returns a list of copy of pandas.DataFrame df  grouped by the list
+    of colnames.
+
+    :param df: pandas.DataFrame
+    :param colname: list of columns to group the given dataframe
+    :return: a list of copy of dfs based on the groups gotten from the colnames used for 
+    grouping 
+    """
+    listDfs = []
+    d = df.copy()
+    dfGroupDict = d.groupby(colname).groups
+    for key in dfGroupDict.keys():
+        listDfs.append(get_df_only_with_indices(d,dfGroupDict[key]))
+    
+    return listDfs

@@ -21,7 +21,7 @@ import random
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import KFold as sk_KFold
-
+import statsmodels.api as sm
 
 # Must define variable: fig_path_liel
 
@@ -484,4 +484,128 @@ def tune_GLM_elastic_net(fig_path_liel, model_df, y_col_name, x_cols_list, cv_fo
 
     return elastic
 
+def doGLM(df, outcomedf, outcomeVar,predictors, covariates=[], logistic=True):
+    '''
+    A function which performs glm analysis on the given input dataframe and outcome df on the list of predictor varaibles 
+    given. The funciton also takes into account the any covaraites given for buidling the model.
+    The functions does a univariate analysis on each of the given input variables against the outcome.
+    A dataframe with Odd ratio,Lower limit , Upper limit ,pvalue ,difference , number of observation, const and beta for prec and each covaraiate is 
+    constructed.
+    :param df:dataframe with all the variables to be used for analysis. 
+    :param outcomedf :dataframe with all the outcome variables against which input variable have to analysed
+    :param outcomeVar :string. name of the outcome var to be analysed 
+    :param predictors :list.all the predictors or variable to be analysed.
+    :param covariates :list. variables to be used as covariates along with input variable.
+    :param logistic: Boolean. to check whether logistic or linear analyis to perform. default is logistic 
+    :return dataframe with ['OR', 'LL', 'UL', 'pvalue', 'Diff', 'N',"ParamConst","ParamBeta"] and with all the const and beta values of covaraites.
+    '''
+    cols = []
+    index = []
+  
+    if logistic:
+        family = sm.families.Binomial()
+        coefFunc = np.exp
+        cols = ['OR', 'LL', 'UL', 'pvalue', 'Diff', 'N',"ParamConst","ParamBeta"]
+    else:
+        family = sm.families.Gaussian()
+        coefFunc = lambda x: x
+        cols = ['Coef', 'LL', 'UL', 'pvalue', 'Diff', 'N',"ParamConst","ParamBeta"]
+    
+    cols = cols+covariates
+
+    #ignore if the predictors are unit8(categorical)
+    for col in predictors:
+        if df[col].dtype.name =='uint8':
+            continue
+        index.append(col)
+        
+    outDf = pd.DataFrame(index=index,columns=cols)
+    params = []
+    pvalues = []
+    resObj = []
+    for i, predc in enumerate(predictors):
+        if df[predc].dtype.name =='uint8':
+            continue
+        #adjust may be called as covariate or control var
+        exogVars = list(set([predc] + covariates))
+        tmp = df[exogVars].join(outcomedf).dropna()
+        model = sm.GLM(endog=tmp[outcomeVar].astype(float), exog=sm.add_constant(tmp[exogVars].astype(float)),
+                       family=family)
+        try:
+            res = model.fit()
+            outDf.OR[predc] = coefFunc(res.params[predc])
+            outDf.pvalue[predc] = res.pvalues[predc]
+            coefficent=  coefFunc(res.conf_int().loc[predc])
+            outDf.LL[predc] = coefficent[0]
+            outDf.UL[predc] = coefficent[1]
+            outDf.Diff[predc] = tmp[predc].loc[tmp[outcomeVar] == 1].mean() - tmp[predc].loc[tmp[outcomeVar] == 0].mean()
+            outDf.ParamConst[predc] = res.params.get(key="const")
+            outDf.ParamBeta[predc] = res.params.get(key=predc)
+            for c in covariates:
+                outDf.at[predc,c]=  res.params.get(key=c)
+           # params.append(res.params.to_dict())
+            pvalues.append(res.pvalues.to_dict())
+            resObj.append(res)
+        except sm.tools.sm_exceptions.PerfectSeparationError:
+            outDf.OR[predc] = np.nan
+            outDf.pvalue[predc] = 0.0
+            outDf.LL[predc] = np.nan
+            outDf.UL[predc] = np.nan
+            outDf.Diff[predc] = tmp[predc].loc[tmp[outcomeVar] == 1].mean() - tmp[predc].loc[tmp[outcomeVar] == 0].mean()
+            outDf.ParamConst[predc] = np.nan
+            outDf.ParamBeta[predc] = np.nan
+            for c in covariates:
+                outDf.at[predc,c]=  np.nan
+            #params.append({k: np.nan for k in [predc] + adj})
+            pvalues.append({k: np.nan for k in [predc] + covariates})
+            resObj.append(None)
+            print('PerfectSeparationError: %s with %s' % (predc, outcomeVar))
+        outDf.N[predc] = tmp.shape[0]
+    
+    #outDf['params'] = params
+    outDf['pvalues'] = pvalues
+    outDf['res'] = resObj
+    
+    return outDf
+
+def GLMAnalysis(dataDf,predictors,outcomeVars=[],covariateVars=[],standardize=True,logistic=True,univariate=True):
+    """
+    A functions which prepares the data for GLM analysis and performs GLM Analysis on the input dataframe
+    The function applies normalisation on the input the variables. It splits the df into output and input df.
+    :param df:dataframe with all the variables to be used for analysis. 
+    :param dataDf :dataframe
+    :param outcomeVar :list. all the outcome vairables to be used for analysis 
+    :param predictors :list.all the predictors or variable to be analysed.
+    :param covariateVars :list. variables to be used as covariates along with input variable.default is to apply 
+    :param standardize: boolean. To apply normalisation or not the input variables.
+    :param logistic: Boolean. to check whether logistic or linear analyis to perform. default is logistic regression
+    :param univariate: Boolean perform univariate or multivariate. default is univariate 
+    :return dataframe with ['OR', 'LL', 'UL', 'pvalue', 'Diff', 'N',"ParamConst","ParamBeta"] and with all the const and beta values of covaraites.
+    """
+    resL = []
+    standardizeFunc = lambda col: (col - np.nanmean(col)) / np.nanstd(col)
+   
+    df = dataDf.copy()
+    #drop the column names which are not required for standardisation and also glm analysis 
+    #e.g ptid 
+    for outcome in outcomeVars:
+        """Logistic regression on outcome"""
+        if standardize:  # standardize the values
+            for prec in predictors:
+                if len(df[prec].unique()) > 2:
+                    df[[prec]] = df[[prec]].apply(standardizeFunc)
+        
+                if not logistic: # if continuous outcomes, standardize to normal distribution Z
+                    df[[outcome]] = df[[outcome]].apply(standardizeFunc)
+                    #outcomeseries = outcomeseries.apply(standardizeFunc)
+        # remove outcome variable from the df and create a seperate outcome df 
+        outcomeDf = df[[outcome]]
+        df = df.drop(outcome,axis=1)
+        if outcome in predictors:
+            predictors.remove(outcome)
+        #resDf = performGLM(df, outcome, predictors, adj=adjustmentVars, logistic=logistic)
+        resDf = doGLM(df, outcomeDf, outcome,predictors, covariates=covariateVars, logistic=logistic)
+
+    #resDf = pd.concat(resL, axis=0, ignore_index=True)
+    return resDf
 
