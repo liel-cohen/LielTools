@@ -562,6 +562,8 @@ def distance_between_tow_clusters(cluster1,cluster2,pdist_metric="jaccard",diful
 
     """
     assert (cluster1.columns == cluster2.columns).all(), "The tow dataframe need to have the same cols"
+    #assert cluster1.shape[0]!= 0,"cluster 1 is empty"
+    #assert cluster2.shape[0]!= 0,"cluster 2 is empty"
 
 
     if len(set(cluster1.index.intersection(cluster2.index))) != 0 :#is their overlap
@@ -577,15 +579,57 @@ def distance_between_tow_clusters(cluster1,cluster2,pdist_metric="jaccard",diful
     contact_clusters = pd.concat([cluster1,cluster2])
     distance_metrix = make_dist_df(contact_clusters.T,pdist_metric,difult_identicle_clusters)
     #distance_metrix = pd.DataFrame(squareform(pdist(contact_clusters,metric = pdist_metric)),index=contact_clusters.index,columns=contact_clusters.index)
+    dict_to_return={}
+    if cluster1.shape[0] > 0 and cluster2.shape[0] > 0:
+        dict_to_return["difference"]= {"data": contact_clusters,
+                       "distance": distance_metrix.loc[cluster1.index, cluster2.index],
+                       "mean_distance": flat_df_to_sereis(distance_metrix.loc[cluster1.index, cluster2.index]).mean(axis=1)[
+                           0],
+                       "max_distance": flat_df_to_sereis(distance_metrix.loc[cluster1.index, cluster2.index]).max(axis=1)[
+                           0],
+                       "min_distance": flat_df_to_sereis(distance_metrix.loc[cluster1.index, cluster2.index]).min(axis=1)[
+                           0],
+                       "median_distance":
+                           flat_df_to_sereis(distance_metrix.loc[cluster1.index, cluster2.index]).median(axis=1)[0],
+                       "std_median": flat_df_to_sereis(distance_metrix.loc[cluster1.index, cluster2.index]).std(axis=1)[0]}
+    else:
+        dict_to_return["difference"] = {}
+    if cluster1.shape[0] > 1:
+        dict_to_return["cluster1"] = {"data":cluster1,
+                        "distance":distance_metrix.loc[cluster1.index,cluster1.index],
+                        "mean_distance":
+                            upper_tri_masking(distance_metrix.loc[cluster1.index, cluster1.index]).mean(),
+                        "max_distance":
+                            upper_tri_masking(distance_metrix.loc[cluster1.index, cluster1.index]).max(),
+                        "min_distance":
+                            upper_tri_masking(distance_metrix.loc[cluster1.index, cluster1.index]).min(),
+                        "median_distance":
+                            np.median(upper_tri_masking(distance_metrix.loc[cluster1.index, cluster1.index])),
+                        "std_median":
+                            upper_tri_masking(distance_metrix.loc[cluster1.index, cluster1.index]).std()}
+    elif cluster1.shape[0] == 1:
+        dict_to_return["cluster1"] ={"data":cluster1,"distance":distance_metrix.loc[cluster1.index,cluster1.index]}
+    else:
+        dict_to_return["cluster1"] = {}
+    if cluster2.shape[0] > 1:
+        dict_to_return["cluster2"] = {"data":cluster2,
+                        "distance":distance_metrix.loc[cluster2.index,cluster2.index],
+                        "mean_distance":
+                            upper_tri_masking(distance_metrix.loc[cluster2.index, cluster2.index]).mean(),
+                        "max_distance":
+                            upper_tri_masking(distance_metrix.loc[cluster2.index, cluster2.index]).max(),
+                        "min_distance":
+                            upper_tri_masking(distance_metrix.loc[cluster2.index, cluster2.index]).min(),
+                        "median_distance":
+                            np.median(upper_tri_masking(distance_metrix.loc[cluster2.index, cluster2.index])),
+                        "std_median":
+                            upper_tri_masking(distance_metrix.loc[cluster2.index, cluster2.index]).std()}
+    elif cluster2.shape[0] > 1:
+        dict_to_return["cluster2"] ={"data":cluster2,"distance":distance_metrix.loc[cluster2.index,cluster2.index]}
+    else:
+        dict_to_return["cluster1"] = {}
 
-    return {"mean_distance": flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).mean(axis=1)[0],
-            "max_distance" : flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).max(axis=1)[0],
-            "min_distance" : flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).min(axis=1)[0],
-            "median_distance": flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).median(axis=1)[0],
-            "std_median": flat_df_to_sereis(distance_metrix.loc[cluster1.index,cluster2.index]).std(axis=1)[0],
-            "cluster1":cluster1,
-            "cluster2":cluster2,
-            "distance_metrix":distance_metrix}
+    return dict_to_return
 
 def flat_df_to_sereis(df):
     v = df.unstack().to_frame().sort_index(level=1).T
@@ -645,3 +689,13 @@ def make_dist_df(binary_dataframe,how="jaccard",diagonal_value = 1):
 
     np.fill_diagonal(corr.values, diagonal_value)
     return corr
+
+def upper_tri_masking(dataframe):
+    """
+    will return a array of the upper diagonal trio without the main diagonal
+    """
+    A = np.array(dataframe)
+    m = A.shape[0]
+    r = np.arange(m)
+    mask = r[:,None] < r
+    return A[mask]
