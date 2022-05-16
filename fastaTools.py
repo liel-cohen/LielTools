@@ -1,0 +1,207 @@
+import pandas as pd
+import numpy as np
+import sys
+
+if 'LielTools' in sys.modules:
+    from LielTools import DataTools
+else:
+    import DataTools
+
+from collections import defaultdict
+
+from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
+import Bio
+
+####### ------------------ seqTools - fasta files ------------------#### <editor-fold>
+
+def fasta_count_num_seqs(fasta_path):
+    """
+    Count the number of sequences in a fasta file using a for loop.
+    @param fasta_path: str. Path to fasta file
+    @return: int. Number of sequences in the file
+    """
+    input_handle = open(fasta_path, "r")
+    count = 0
+    for record in SeqIO.parse(input_handle, "fasta"):
+        count += 1
+    return count
+
+
+def fasta_extract_seqs_to_list(fasta_path, k=np.inf):
+    """
+    Extract the first k sequences from a fasta file and return as a list of records.
+    @param fasta_path: str. Path to fasta file
+    @param k: int. Number of sequences to be retrieved from the file.
+              Default is np.inf (infinity), i.e., extract all sequences
+    @return: A list of sequence records.
+    """
+    seqs = list()
+    input_handle = open(fasta_path, "r")
+    count = 0
+    for record in SeqIO.parse(input_handle, "fasta"):
+        seqs.append(record)
+        count += 1
+
+        if count >= k:
+            break
+
+    return seqs
+
+
+def write_seqs_to_fasta_file(sequences, fasta_path):
+    """
+    Writes a list of sequence records to a fasta file.
+    @param sequences: List  of sequence records (biopython SeqRecord objects)
+    @param fasta_path: Path of fasta file to write the sequences to
+    @return:
+    """
+    with open(fasta_path, "w") as output_handle:
+        SeqIO.write(sequences, output_handle, "fasta")
+
+
+def fasta_seq_length_hist(fasta_path, output_format='series', print_hist=False):
+    """
+    Create a histogram of the lengths of sequences from a given fasta file.
+
+    @param fasta_path: str. Path to fasta file
+    @param output_format: output format of the histogram - 'series' or 'dict'
+    @param print_hist: if True, will print the histogram (as a Series sorted by lengths)
+    @return: The histogram
+    """
+    len_hist = defaultdict(int)
+    input_handle = open(fasta_path, "r")
+    for record in SeqIO.parse(input_handle, "fasta"):
+        len_hist[len(record.seq)] += 1
+
+    len_hist_series = pd.Series(len_hist).sort_index()
+    if print_hist:
+        print(len_hist_series)
+
+    if output_format=='series':
+        return len_hist_series
+    elif output_format=='dict':
+        return len_hist
+    else:
+        raise ValueError(f'Unsupported output_format: {output_format}')
+
+
+def fasta_unique_seqs(fasta_path, fasta_output_path=None, trim_last_char_if_invalid=False, invalid_chars=['*', 'X']):
+    """
+    Get the uniques set of sequences and their counts from a fasta file.
+    Each sequence ID will be seq{i}_n={n}, i being the sequence index in
+    the list of sequences (sorted by descending counts), n being the number
+    of sequences in the original file in fasta_path, with the same sequence.
+
+    @param fasta_path: str. Path to fasta file
+    @param fasta_output_path: Path for saving the new file of unique sequences.
+                              If None, sequences won't be saved to file. Default None.
+    @param trim_last_char_if_invalid: If true, the last character of each sequence will be trimmed
+                                      if it's an invalid character.
+    @params invalid_chars: list. list of characters to be considered invalid. default ['*', 'X']
+    @return: seq_hist (dict of sequences and their counts),
+             seq_series (series of sequences and their counts, ordered by descending counts),
+             seq_ordered_list (list of sequences, ordered by descending counts)
+    """
+    # get a histogram dict of unique sequences and their counts
+    seq_hist = defaultdict(int)
+    counter = 0
+    input_handle = open(fasta_path, "r")
+    for record in SeqIO.parse(input_handle, "fasta"):
+        seq_hist[record.seq] += 1
+        counter += 1
+
+    # just make sure the histogram sum == num of sequences
+    n = DataTools.sum_dict_vals(seq_hist)
+    assert n == counter
+
+    # print num sequences found out of n
+    print(f'Out of {n:,} sequences, number of unique sequences found: {len(seq_hist):,}')
+
+    # create a sorted series (by descending count)
+    seq_series = pd.Series(seq_hist).sort_values(ascending=False)
+
+    # make a sorted sequences list
+    seq_ordered_list = []
+    for i in range(len(seq_series.index)):
+        seq = str(seq_series.index[i])
+        if trim_last_char_if_invalid:
+            if seq[-1] in invalid_chars:
+                seq = seq[:-1]
+        seq_id = f'seq{i + 1}_n-{seq_series.iloc[i]}'
+
+        seq_ordered_list.append(Bio.SeqRecord.SeqRecord(Bio.Seq.Seq(seq), id=seq_id))
+
+    # save sequences to a new fasta
+    if fasta_output_path is not None:
+        write_seqs_to_fasta_file(seq_ordered_list, fasta_output_path)
+        print(f'Wrote unique sequences to output file: {fasta_output_path}')
+
+    return seq_hist, seq_series, seq_ordered_list
+
+
+def fasta_find_character(fasta_path, char='*', print_res=True):
+    """
+    Check appearances of a certain character in all sequences of a fasta file.
+    Useful for checking if there are invalid '*' or 'X' characters.
+    @param fasta_path: str. Path to fasta file
+    @param char: character to find. Default '*'
+    @param print_res: boolean. Whether to print the histograms. Default True
+    @return: tuple:
+        # int. count of sequences containing char
+        # int. total number of sequences
+        # dict. Histogram of index of first appearance in each string
+        # dict. Histogram of the number of appearances in each string
+    """
+    first_appearance_hist = defaultdict(int)
+    num_appearances_hist = defaultdict(int)
+    counter = 0
+    count_seqs_with_char = 0
+    input_handle = open(fasta_path, "r")
+    for record in SeqIO.parse(input_handle, "fasta"):
+        seq = str(record.seq)
+        if char in seq:
+            count_seqs_with_char += 1
+            first_appearance_hist[seq.index(char)] += 1
+            num_appearances_hist[seq.count(char)] += 1
+        counter += 1
+
+    print(f'Found {count_seqs_with_char:,} sequences containing {char} out of {counter:,} total sequences.')
+    if print_res:
+        print(f'\nHistogram of index of first appearance of {char} in each string:')
+        print(first_appearance_hist)
+        print(f'\nHistogram of number of appearances of {char} in each string:')
+        print(first_appearance_hist)
+
+    return count_seqs_with_char, counter, first_appearance_hist, num_appearances_hist
+
+def fasta_remove_seqs_longer_than_x(fasta_path, x, fasta_output_path=None):
+    """
+    Gets sequences from fasta file, removes sequences that are of length larger than x.
+    (The order of the sequences that are kept is preserved)
+
+    @param fasta_path: str. Path to fasta file
+    @param x: int. Maximal length for a sequence to be kept.
+    @param fasta_output_path: Path for saving the new file of sequences not longer than x.
+                              If None, sequences won't be saved to file. Default None.
+    @return: List of sequences not longer than x
+    """
+    counter = 0
+    count_valid_seqs = 0
+    sequences = []
+    input_handle = open(fasta_path, "r")
+    for record in SeqIO.parse(input_handle, "fasta"):
+        if len(record.seq) <= x:
+            sequences.append(record)
+            count_valid_seqs += 1
+        counter += 1
+
+    print(f'Found and removed {(counter-count_valid_seqs):,} sequences longer than {x} out of {counter:,} total sequences.')
+
+    if fasta_output_path is not None:
+        write_seqs_to_fasta_file(sequences, fasta_output_path)
+        print(f'Wrote sequences to output file: {fasta_output_path}')
+
+    return sequences
+
+# </editor-fold>

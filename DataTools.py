@@ -473,7 +473,6 @@ def csr_matrix_to_df(matrix):
     dense = matrix.todense()
     return pd.DataFrame(dense)
 
-
 def get_df_col_unique_vals_dict(db, col_names=None, print_cols=False):
     if col_names is None:
         col_names = db.columns
@@ -560,3 +559,9 @@ def read_excel(path, sheet=0, index_col=None):
         except:
             df = pd.read_excel(path, sheet_name=sheet, index_col=index_col, engine='xlrd')
     return df
+
+def sum_dict_vals(d):
+    d_sum = 0
+    for key in d:
+        d_sum += d[key]
+    return d_sum

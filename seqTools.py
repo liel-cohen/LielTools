@@ -3,10 +3,11 @@ import numpy as np
 from functools import partial
 from itertools import product
 import sys
-import keras
+# import keras # inserted to relevant function instead here: strSeries2_1H
 import copy as copy_module
 import matplotlib.pyplot as plt
 import warnings
+from collections import defaultdict
 
 if 'LielTools' in sys.modules:
     from LielTools import FileTools
@@ -19,6 +20,8 @@ else:
     import PlotTools
     import MyLabelEncoder
 
+from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
 
 ####### ------------------ seqTools - general ------------------#### <editor-fold>
 
@@ -302,6 +305,10 @@ def get_kmers_counts_and_positions(series, k, indices=None,
 
     return kmers_counts, kmers_pos_counts
 
+# def get_kmers_from_seqs_by_class(seq_series, class_series):
+#     classes = list(class_series.unique())
+
+
 
 def create_gapped_list_from_kmer(kmer, gap, gap_symbol='0'):
     '''
@@ -365,6 +372,7 @@ def strSeries2_1H(stringSeries, charEncoder=None, padding=True, gaps=False):
         one hot vector.
         If charEncoder is given, makes sure the charEncoder alphabet is identical
         to the the stringSeries alphabet'''
+    import keras
 
     charEncoderWasGiven = charEncoder is not None
 
@@ -466,7 +474,6 @@ def matrix_1H_to_1H(transMap=None, d1AlphabetMap=None, d2AlphabetMap=None):
         filter[d1_letter_int, d2_letter_int] = 1
 
     return filter
-
 
 # </editor-fold>
 
