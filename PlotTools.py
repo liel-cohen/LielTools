@@ -34,13 +34,13 @@ import scipy.stats as stats
 # former plotBoxplot
 def plot_boxplot(seriesX, seriesY, seriesHue=None,
                  stripplot=True, boxplot=True,
-                 saveFolder=None, ax=None, palette=None,
-                 figsize=(7, 6), showf=False, plotTitle='', xTitle='', yTitle='',
+                 ax=None, order=None, palette=None,
+                 figsize=(7, 6), showfliers=False, plotTitle='', xTitle='', yTitle='',
                  xRotation=45, titleFontSize=18, titleColor='maroon', legendTitle='',
                  font_scale=1, snsStyle='ticks', boxTransparency=0.6, jitter=0.15,
                  stripplot_alpha=0.7, stripplot_size=4, stripplot_color=None,
                  linewidth=0, stripplot_palette=None,
-                 order=None, xy_title_fontsize=None,
+                 xy_title_fontsize=None,
                  boxplot_color=None,
 
                  add_mean=False,
@@ -55,7 +55,81 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                  color_indices_linewidth=0, color_indices_alpha=1, color_indices_marker='o',
 
                  hide_indices_in_stripplot=None,
-                 horizontal=False):
+                 horizontal=False,
+
+                 saveFolder=None, save_path=None, dpi=300):
+    """
+    Function for plotting a boxplot and a stripplot over it (or only one of them).
+    Can also add the mean or geometric values for each box - this option currently
+    works only if seriesHue is None.
+    Can color the stripplot markers for specific given indices in a different color.
+    seriesX, seriesY and seriesHue (if given) must have the same indices.
+
+    @param seriesX: pd.Series. The values to be plotted on the x axis - must be categorical/dicrete.
+    @param seriesY: pd.Series. The values to be plotted on the y axis - must be numeric.
+    @param seriesHue: pd.Series. Optional. Categories by which the x levels should be split. Default None
+    @param stripplot: boolean. Whether a stripplot should be plotted.
+    @param boxplot: boolean. Whether a boxplot should be plotted.
+    @param ax: matplotlib axes object on which plot should be plotted.
+               Default None (then a new object will be created).
+    @param order: list of x axis (unique) values by the order they should be displayed (from left to right).
+    @param palette: str. color palette to be used for the boxplot.
+                    Will also be used for the stripplot if stripplot_palette and stripplot_color are None.
+    @param figsize: tuple of 2 numbers representing the figure size to be plotted (width, height). Default (7, 6)
+    @param showfliers: boolean. Whether the fliers should be plotted on the boxplot. Default False.
+    @param plotTitle:
+    @param xTitle:
+    @param yTitle:
+    @param xRotation:
+    @param titleFontSize:
+    @param titleColor:
+    @param legendTitle:
+    @param font_scale:
+    @param snsStyle:
+    @param boxTransparency:
+    @param jitter:
+    @param stripplot_alpha:
+    @param stripplot_size:
+    @param stripplot_color:
+    @param linewidth:
+    @param stripplot_palette:
+    @param xy_title_fontsize:
+    @param boxplot_color: str. Color to be used for all the boxplot elements
+                          (if you don't want to use boxplot_palette).
+                          Will also be used for the stripplot if stripplot_palette, stripplot_color and palette are all None.
+    @param add_mean: boolean. Whether to add a marker showing the mean value for each boxplot.
+                     Currently works only if hue isn't used. Default False
+    @param mean_marker: str. Marker symbol for the mean. Default '_'
+    @param mean_color: str. Color for the mean. Default 'red'
+    @param mean_size:
+    @param mean_linewidth:
+    @param mean_alpha:
+    @param add_gmean: boolean. Whether to add a marker showing the geometric mean value for each boxplot.
+                     Currently works only if hue isn't used. Default False
+    @param gmean_marker: str. Marker symbol for the gmean. Default '_'
+    @param gmean_color: str. Color for the mean. Default 'blue'
+    @param gmean_size:
+    @param gmean_linewidth:
+    @param gmean_alpha:
+    @param color_indices: list of indices (from the given data series).
+                          These indices stripplot markers will be colored
+                          with a different color. Default None.
+    @param color_indices_color: str. Color for the color_indices. Default 'red'
+    @param color_indices_size: int. Marker size for the color_indices. Default 20
+    @param color_indices_linewidth: float. Marker linewidth for the color_indices. Default 0
+    @param color_indices_alpha: float. Marker alpha for the color_indices. Default 1
+    @param color_indices_marker: str. Marker symbol for the color_indices. Default 'o'
+    @param hide_indices_in_stripplot: list of indices (from the given data series).
+                                      Specific indices that should not be plotted in the stripplot.
+                                      Default None.
+    @param horizontal:
+    @param saveFolder: str. folder in which to save the plot in jpg file.
+                       File name will be automatically formatted using the names
+                       of x, y and hue titles. Default None.
+    @param save_path: str. full file path for saving the plot to file system. Default None.
+    @param dpi: int. The dpi value for file saving. Default 300.
+    @return: matplotlib axes object
+    """
     # * hide_indices_in_stripplot - don't plot specific values in stripplot
     # (not all given indices must be contained in df.index)
 
@@ -110,7 +184,7 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
         if boxplot:
             sns.boxplot(data=data, x=DataTools.get_col_name(seriesX),
                         y=DataTools.get_col_name(seriesY), ax=ax,
-                        showfliers=showf,
+                        showfliers=showfliers,
                         hue=DataTools.get_col_name(seriesHue),
                         boxprops=dict(alpha=boxTransparency),
                         palette=palette, order=order, color=boxplot_color)
@@ -124,7 +198,7 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
     else:                     # no hue
         if boxplot:
             sns.boxplot(data=data, x=DataTools.get_col_name(seriesX), ax=ax,
-                        y=DataTools.get_col_name(seriesY), showfliers=showf,
+                        y=DataTools.get_col_name(seriesY), showfliers=showfliers,
                         boxprops=dict(alpha=boxTransparency),
                         palette=palette, order=order, color=boxplot_color)
         if stripplot:
@@ -211,14 +285,18 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
     xticksText = bin_text_to_yes_no(xticksText)
     ax.set_xticklabels(xticksText)
 
+    plt.tight_layout()
+
     if saveFolder is not None:
         fileName = 'Boxplot - ' + xTitle + ' VS ' + yTitle
         if seriesHue is not None:
             fileName = fileName + ' BY ' + legendTitle + '.jpg'
         else:
             fileName = fileName + '.jpg'
-        plt.tight_layout()
-        save_plt(save_path=saveFolder + fileName)
+        save_plt(save_path=saveFolder + fileName, dpi=dpi)
+
+    if save_path is not None:
+        save_plt(save_path=save_path, dpi=dpi)
 
     return ax
 
@@ -1459,6 +1537,31 @@ def plot_columns_dist(df, output_file_path=None, fig_rows=4, fig_cols=5, figsize
                       rug=False, rug_color='black', rug_alpha=0.3,
                       rug_linewidth=1, rug_height=0.03, font_scale=1,
                       sns_style='ticks', x_rotation=0):
+    """
+    Plot a grid of distribution plots - one for each column of a given pandas.Dataframe.
+
+    @param df: pd.Dataframes with columns to be plotted (columns must be numeric)
+    @param output_file_path: str. full file path for saving the plot to file system. Default None.
+    @param fig_rows: int. Number of rows for the distplots grid. Default 4.
+    @param fig_cols: int. Number of columns for the distplots grid. Default 5.
+    @param figsize:
+    @param kde_color:
+    @param hist_color:
+    @param hist_alpha:
+    @param title:
+    @param title_fontsize:
+    @param title_y:
+    @param bins:
+    @param rug: boolean. Whether to add a rug at the bottom or not. Default False.
+    @param rug_color:
+    @param rug_alpha:
+    @param rug_linewidth:
+    @param rug_height:
+    @param font_scale:
+    @param sns_style:
+    @param x_rotation:
+    @return: matplotlib figure object
+    """
     sns.set(font_scale=font_scale)
     sns.set_style(sns_style)
 
@@ -1488,6 +1591,7 @@ def plot_columns_dist(df, output_file_path=None, fig_rows=4, fig_cols=5, figsize
     if output_file_path is not None:
         plt.savefig(output_file_path, bbox_inches='tight', dpi=500)
 
+    return fig
 
 def plot_columns_dist_hue(df, hue_col, output_file_path=None, fig_cols=5,
                           hist_alpha=0.5, shade=False, palette="Set1",
@@ -1495,6 +1599,32 @@ def plot_columns_dist_hue(df, hue_col, output_file_path=None, fig_cols=5,
                           rug=False, rug_color='black', rug_alpha=0.3,
                           rug_linewidth=1, rug_height=0.03,
                           fig_height=3, fig_aspect=1, sns_style='ticks'):
+    """
+    Plot a grid of distribution plots with hue - one for each column of a given pandas.Dataframe.
+
+    @param df: pd.Dataframes. All columns except for hue_col will be plotted.
+                              Columns (other than hue_col) must be numeric.
+    @param hue_col: str. The name of the column (from df) to be used as hue.
+                         Must be a categorical/discrete values column.
+    @param output_file_path: str. full file path for saving the plot to file system. Default None.
+    @param fig_cols: int. Number of columns for the distplots grid. Default 5.
+    @param hist_alpha:
+    @param shade:
+    @param palette:
+    @param sharex: boolean.
+    @param sharey: boolean.
+    @param font_scale:
+    @param rug: boolean. Whether to add a rug at the bottom or not. Default False.
+    @param rug_color:
+    @param rug_alpha:
+    @param rug_linewidth:
+    @param rug_height:
+    @param fig_height: numeric - the height of the figure to be created. Default 3
+    @param fig_aspect: aspect - the aspect ratio, determining the figure width.
+                       Width is determined by fig_aspect * fig_height in inches. Default 1
+    @param sns_style:
+    @return: seaborn facetgrid object
+    """
     sns.set(font_scale=font_scale)
     sns.set_style(sns_style)
 
@@ -1512,6 +1642,7 @@ def plot_columns_dist_hue(df, hue_col, output_file_path=None, fig_cols=5,
     if output_file_path is not None:
         plt.savefig(output_file_path, dpi=500, bbox_inches='tight')
 
+    return g
 
 def plot_boxplot_subplots(df, x_col, y_cols, hue_col=None, output_file_path=None, fig_rows=4, fig_cols=5, figsize=(30, 20),
                           title='', title_fontsize=18, title_y=1.03, font_scale=1, sns_style='ticks',
