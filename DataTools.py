@@ -136,14 +136,14 @@ def joinDFsFromList(dfList):
     def join_dfs(ldf, rdf):
         return ldf.join(rdf, how='inner')
 
-    final_df = functools.reduce(join_dfs, dfList)  # that's the magic - do the given function on the list sequentialy
+    final_df = functools.reduce(join_dfs, dfList) # that's the magic - do the given function on the list sequentially
     return (final_df)
 
 def addDFs(dfsList):
     def addDFs(ldf, rdf):
         return ldf.add(rdf)
 
-    final_df = functools.reduce(addDFs, dfsList)  # that's the magic - do the given function on the list sequentially
+    final_df = functools.reduce(addDFs, dfsList) # that's the magic - do the given function on the list sequentially
     return (final_df)
 
 def averageDFs(dfsList):

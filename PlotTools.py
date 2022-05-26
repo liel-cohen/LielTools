@@ -689,6 +689,9 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
                  hide_colorbar=False,
                  xy_labels_fontsize=None,
                  grid_linewidths=0, grid_linecolor='white',
+                 color_specific_xticklabels=None,
+                 color_specific_yticklabels=None,
+                 color_specific_color='red',
                  fix_smaller_rows_at_y_edges_bug=False):
     sns.set(font_scale=font_scale)
     sns.set_context(font_scale=font_scale)
@@ -726,6 +729,20 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
                 ax.collections[0].colorbar.tick_params(axis=u'both', which=u'both', length=0)
         except Exception:
             print("Could not perform line: \nax.collections[0].colorbar.tick_params(axis=u'both', which=u'both', length=0) \nin LielTools_v3\PlotTools.py")
+
+    if color_specific_xticklabels is not None:
+        for i, xticklabel in enumerate(ax.get_xticklabels()):
+            xticklabel_text = str(xticklabel.get_text())
+            for label_from_list in color_specific_xticklabels:
+                if xticklabel_text == str(label_from_list):
+                    xticklabel.set_color(color_specific_color)
+
+    if color_specific_yticklabels is not None:
+        for i, yticklabel in enumerate(ax.get_yticklabels()):
+            yticklabel_text = str(yticklabel.get_text())
+            for label_from_list in color_specific_yticklabels:
+                if yticklabel_text == str(label_from_list):
+                    yticklabel.set_color(color_specific_color)
 
     plt.tight_layout()
     if fix_smaller_rows_at_y_edges_bug:

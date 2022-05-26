@@ -11,6 +11,7 @@ from collections import defaultdict
 
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
+from Bio.Seq import Seq
 import Bio
 
 ####### ------------------ seqTools - fasta files ------------------#### <editor-fold>
@@ -120,6 +121,7 @@ def fasta_unique_seqs(fasta_path, fasta_output_path=None, trim_last_char_if_inva
 
     # create a sorted series (by descending count)
     seq_series = pd.Series(seq_hist).sort_values(ascending=False)
+    seq_series.index = seq_series.index.map(lambda x: ''.join(x))
 
     # make a sorted sequences list
     seq_ordered_list = []
@@ -137,7 +139,7 @@ def fasta_unique_seqs(fasta_path, fasta_output_path=None, trim_last_char_if_inva
         write_seqs_to_fasta_file(seq_ordered_list, fasta_output_path)
         print(f'Wrote unique sequences to output file: {fasta_output_path}')
 
-    return seq_hist, seq_series, seq_ordered_list
+    return seq_series, seq_ordered_list
 
 
 def fasta_find_character(fasta_path, char='*', print_res=True):
@@ -201,6 +203,98 @@ def fasta_remove_seqs_longer_than_x(fasta_path, x, fasta_output_path=None):
     if fasta_output_path is not None:
         write_seqs_to_fasta_file(sequences, fasta_output_path)
         print(f'Wrote sequences to output file: {fasta_output_path}')
+
+    return sequences
+
+def trim_seqs_by_positions(start_pos, end_pos, fasta_path=None, seqs=None, including_end_pos=True, fasta_output_path=None):
+    """
+    Function gets a fasta file (in path) or a list of sequences (Biopython record objects)
+    and trims each of them by the given positions.
+    @param start_pos: starting position of the subsequence to return (inclusive).
+                      For example, for sequence 'abcdef', if you wish to get 'bcd',
+                      the start_pos should be 2.
+    @param end_pos: the end position of the subsequence to return.
+                    if including_end_pos=True, the end position will be included.
+                    For example, for sequence 'abcdef', if you wish to get 'bcd',
+                    the end_pos should be 4 (if including_end_pos=True.
+                    If including_end_pos=False, end_pos should be 5)
+    @param fasta_path: path of fasta file with sequences to trim
+    @param seqs: list of Biopython record objects with sequences to trim
+    @param including_end_pos: boolean. Whether to include end_pos or not.
+    @param fasta_output_path: str. Path to save a fasta file with the trimmed
+                              sequences. Default None (no file is saved)
+    @return: The trimmed sequences list (Biopython record objects)
+    """
+    start_ind = start_pos - 1
+    if including_end_pos:
+        end_ind = end_pos
+    else:
+        end_ind = end_pos - 1
+
+    if (fasta_path is None and seqs is None) or (fasta_path is not None and seqs is not None):
+        raise ValueError('Must get either fasta_path or seqs')
+
+    sequences = []
+
+    if fasta_path is not None:
+        input_handle = open(fasta_path, "r")
+        iterate_over = SeqIO.parse(input_handle, "fasta")
+    elif seqs is not None:
+        iterate_over = seqs
+
+    for record in iterate_over:
+        trimmed_seq = record.seq[start_ind:end_ind]
+        new_record = SeqRecord(id=record.id, seq=trimmed_seq, name=record.name, description=record.description, dbxrefs=record.dbxrefs)
+        sequences.append(new_record)
+
+    if fasta_output_path is not None:
+        write_seqs_to_fasta_file(sequences, fasta_output_path)
+        print(f'Wrote sequences to output file: {fasta_output_path}')
+
+    return sequences
+
+
+def replace_subseq_in_range(start_pos, end_pos, fasta_path=None, seqs=None, fasta_output_path=None, char_replace='X'):
+    """
+    Function gets a fasta file (in path) or a list of sequences (Biopython record objects).
+    For each sequence, the subsequence starting at start_pos and ending in end_pos (inclusive)
+    will be replaced by characters defined by char_replace.
+    For example, for sequence 'abcdefg', start_pos=2, end_pos=4, char_replace='X'
+    the new sequence will be 'aXXXefg'
+
+    @param start_pos: starting position of the subsequence to be replaced (inclusive).
+    @param end_pos: the end position of the subsequence to be replaced (inclusive).
+    @param fasta_path: path of fasta file with sequences to edit
+    @param seqs: list of Biopython record objects with sequences to edit
+    @param fasta_output_path: str. Path to save a fasta file with the new
+                              sequences. Default None (no file is saved)
+    @return: The new sequences list (Biopython record objects)
+    """
+
+    if (fasta_path is None and seqs is None) or (fasta_path is not None and seqs is not None):
+        raise ValueError('Must get either fasta_path or seqs')
+
+    sequences = []
+
+    if fasta_path is not None:
+        input_handle = open(fasta_path, "r")
+        iterate_over = SeqIO.parse(input_handle, "fasta")
+    elif seqs is not None:
+        iterate_over = seqs
+
+    start_ind = start_pos - 1
+    seq_replace = char_replace * (end_pos-start_pos+1)
+
+    for record in iterate_over:
+        seq_before = record.seq[:start_ind] # original seq *before* the subseq to replace
+        seq_after = record.seq[end_pos:] # original seq *after* the subseq to replace
+        new_seq = seq_before + seq_replace + seq_after
+        new_record = SeqRecord(id=record.id, seq=new_seq, name=record.name, description=record.description, dbxrefs=record.dbxrefs)
+        sequences.append(new_record)
+
+    if fasta_output_path is not None:
+        write_seqs_to_fasta_file(sequences, fasta_output_path)
+        print(f'Wrote unique sequences to output file: {fasta_output_path}')
 
     return sequences
 
