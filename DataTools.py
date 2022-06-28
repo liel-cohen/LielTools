@@ -1,7 +1,3 @@
-from copy import copy
-from pickle import TRUE
-from matplotlib.pyplot import copper
-from mysqlx import Column
 import pandas as pd
 import functools
 import math
@@ -651,3 +647,25 @@ def get_DFs_group_by_colname(df,colname = []):
         listDfs.append(get_df_only_with_indices(d,dfGroupDict[key]))
     
     return listDfs
+	
+	def read_excel(path, sheet=0, index_col=None):
+    """
+    @param path: str. path of file to be read.
+    @param sheet: str or int. sheet to be exported. Default: 0 (first sheet)
+    @param index_col: str. name (string) of the column to be defined as index
+    @return: imported pd.DataFrame
+    """
+    try:
+        df = pd.read_excel(path, sheet_name=sheet, index_col=index_col)
+    except:
+        try:
+            df = pd.read_excel(path, sheet_name=sheet, index_col=index_col, engine='openpyxl')
+        except:
+            df = pd.read_excel(path, sheet_name=sheet, index_col=index_col, engine='xlrd')
+    return df
+
+def sum_dict_vals(d):
+    d_sum = 0
+    for key in d:
+        d_sum += d[key]
+    return d_sum

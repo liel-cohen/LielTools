@@ -22,6 +22,16 @@ from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import KFold as sk_KFold
 import statsmodels.api as sm
+if 'LielTools' in sys.modules:
+    from LielTools import StatsTools
+    from LielTools import DataTools
+    from LielTools import PlotTools
+    from LielTools import FileTools
+else:
+    import StatsTools
+    import DataTools
+    import PlotTools
+    import FileTools
 
 # Must define variable: fig_path_liel
 
@@ -75,7 +85,7 @@ def glm_cv(fig_path_liel, model_df, y_col_name, x_cols_list, cv_folds, model_nam
 
 def glm_cv_linear(fig_path_liel, model_df, y_col_name, x_cols_list, cv_folds, model_name, figsize=(12, 8),
                   alpha=0.001, L1_wt=0.01):
-    FileTools.createFolder(fig_path_liel + '/GLM/{}/'.format(model_name))
+    FileTools.create_folder(fig_path_liel + '/GLM/{}/'.format(model_name))
 
     random.seed(42)
     np.random.seed(42)

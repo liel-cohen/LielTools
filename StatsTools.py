@@ -14,6 +14,8 @@ from statsmodels.base.elastic_net import RegularizedResultsWrapper
 import math
 from scipy import stats
 from sklearn.metrics import confusion_matrix
+from scipy.stats import wilcoxon
+from sklearn.metrics import log_loss
 
 if 'LielTools' in sys.modules:
     from LielTools import DataTools
@@ -25,10 +27,224 @@ else:
     import FileTools
 
 
-def showColCounts(column):
-    ''' Gets a column, shows a figure of value counts '''
-    sns.countplot(column,label="Count")
-    plt.show()
+def perform_mann_whitney_u_wilcoxon_rank_sum(series1, series2, alternative='two-sided', print_res=True, alpha=0.05):
+    """
+    The Mann-Whitney U test is a nonparametric statistical significance test for determining whether two independent samples
+    were drawn from a population with the same distribution.
+
+    The test was named for Henry Mann and Donald Whitney, although it is sometimes called the Wilcoxon-Mann-Whitney test,
+    also named for Frank Wilcoxon, who also developed a variation of the test.
+
+    The two samples are combined and rank ordered together. The strategy is to determine if the values from the two samples are
+    randomly mixed in the rank ordering or if they are clustered at opposite ends when combined.
+    A random rank order would mean that the two samples are not different,
+    while a cluster of one sample values would indicate a difference between them.
+
+    The default assumption or null hypothesis is that there is no difference between the distributions of the data samples.
+    Rejection of this hypothesis suggests that there is likely some difference between the samples.
+    More specifically, the test determines whether it is equally likely that any randomly selected observation
+    from one sample will be greater or less than a sample in the other distribution.
+    If violated, it suggests differing distributions.
+
+    Fail to Reject H0: Sample distributions are equal.
+    Reject H0: Sample distributions are not equal.
+
+    Info from: https://machinelearningmastery.com/nonparametric-statistical-significance-tests-in-python/
+    @param: series1: data series 1. Can be pd.Series or N-d arrays of samples
+    @param: series2: data series 2. Can be pd.Series or N-d arrays of samples
+    @param: alternative: ‘two-sided’, ‘less’, ‘greater’. Default 'two-sided'
+    @param: print_res: boolean. Whether to print the test statistic, pvalue and conclusion. Default True
+    @return: alpha: Alpha to determine whether p-value is significant or not. default 0.05
+    return: stat, pval
+    """
+    stat, pval = stats.mannwhitneyu(x=series1, y=series2, alternative=alternative)
+
+    if print_res:
+        print(f'Mann-whitney U / Wilcoxon rank-sum test (alternative: {alternative}): \nStatistic={stat}, p-value={pval}.')
+
+        if pval > alpha:
+            print('Data drawn from same distribution (failed to reject H0)')
+        else:
+            print('Data drawn from different distributions (can reject H0)')
+
+
+def perform_wilcoxon_signed_rank(series1, series2, alternative='two-sided', print_res=True, alpha=0.05):
+    """
+    A nonparametric statistical significance test for determining whether two dependent samples (paired)
+    were drawn from a population with the same distribution.
+    For the test to be effective, it requires at least 20 observations in each data sample.
+
+    Fail to Reject H0: Sample distributions are equal.
+    Reject H0: Sample distributions are not equal.
+
+    Info from: https://machinelearningmastery.com/nonparametric-statistical-significance-tests-in-python/
+
+    @param: series1: data series 1. Can be pd.Series or N-d arrays of samples
+    @param: series2: data series 2. Can be pd.Series or N-d arrays of samples
+    @param: alternative: ‘two-sided’, ‘less’, ‘greater’. Default 'two-sided'
+    @param: print_res: boolean. Whether to print the test statistic, pvalue and conclusion. Default True
+    @return: alpha: Alpha to determine whether p-value is significant or not. default 0.05
+    return: stat, pval
+    """
+    stat, pval = wilcoxon(x=series1, y=series2, alternative=alternative)
+
+    if print_res:
+        print(f'Wilcoxon signed-rank test (alternative: {alternative}): \nStatistic={stat}, p-value={pval}.')
+
+        if pval > alpha:
+            print('Data drawn from same distribution (failed to reject H0)')
+        else:
+            print('Data drawn from different distributions (can reject H0)')
+
+
+def perform_shapiro_wilk(data_series, print_res=True, alpha=0.05):
+    """
+    The Shapiro-Wilk test tests the null hypothesis that the data was drawn from a normal distribution.
+
+    If the p-value obtained from the Shapiro-Wilk test is significant (p < 0.05),
+    we conclude that the data is not normally distributed.
+
+    @param: data_series: data series to test. Can be pd.Series or N-d arrays of samples
+    @param: print_res: boolean. Whether to print the test statistic, pvalue and conclusion. Default True
+    @return: alpha: Alpha to determine whether p-value is significant or not. default 0.05
+    return: stat, pval
+    """
+    stat, pval = stats.shapiro(data_series)
+
+    if print_res:
+        print(f'Shapiro-Wilk test - Statistic={stat}, p-value={pval}.')
+
+        if pval > alpha:
+            print('Data is normally distributed (failed to reject H0)')
+        else:
+            print('Data is not normally distributed (rejected H0)')
+
+
+def chi_square_test_independence(df=None, var1_name=None, var2_name=None, table_observed=None, alpha=0.05,
+                                 print_res=True, plot_fig=True, figsize=(12, 5), annotate_fontsize=8,
+                                 font_scale=1, fix_smaller_rows_at_y_edges_bug=True):
+    """
+    Perform a Chi-square test of independence over a table of observed values between
+    two categories.
+    Function can either get the table of observed values itself (as a pd.Dataframe),
+    for example:
+                   Yes  No
+            Red     50  20
+            Blue    20  90
+            Green   30  90
+
+    ( table_observed = pd.DataFrame({'Yes': {'Red': 50, 'Blue': 20, 'Green': 30}, 'No': {'Red': 20, 'Blue': 90, 'Green': 90}})  )
+    or, can get a pd.Dataframe and 2 variables (columns) names and create such table.
+
+    @param df: pd.Dataframe.
+    @param var1_name: str, the name of a column in df with categorical data.
+                        If table_observed is given, string will be used as title in plot. (optional)
+    @param var2_name: str, the name of a column in df with categorical data.
+                        If table_observed is given, string will be used as title in plot. (optional)
+    @param table_observed: pd.Dataframe of an observed values table
+    @param alpha: Alpha to determine whether p-value is significant or not. default 0.05
+    @param print_res: boolean. Whether to print the test statistic, pvalue and conclusion. Default True
+    @param plot_fig: boolean. Whether to plot a figure with the tables of
+                     expected, observed and (O-E)^2 / E values
+    @return: chi_square_statistic, p_value, fig (if plot_fig is True)
+    """
+    if table_observed is None:
+        if (df is not None) and (var1_name is not None) and (var2_name is not None):
+            table_observed = df.groupby(by=[var1_name, var2_name]).size().unstack().fillna(0)
+        else:
+            raise ValueError('Must get either table_observed or df, var1 and var2.')
+
+    n = table_observed.sum().sum()
+    prob_var1 = table_observed.sum(axis=1) / n
+    prob_var2 = table_observed.sum() / n
+
+    table_expected = pd.DataFrame(index=table_observed.index, columns=table_observed.columns)
+    for val1 in table_expected.index:
+        for val2 in table_expected.columns:
+            table_expected.loc[val1, val2] = prob_var1[val1] * prob_var2[val2] * n
+
+    table_X2_per_cell = pd.DataFrame(index=table_observed.index, columns=table_observed.columns)
+    for val1 in table_X2_per_cell.index:
+        for val2 in table_X2_per_cell.columns:
+            X2_cell = ((table_observed.loc[val1, val2] - table_expected.loc[val1, val2]) ** 2) / table_expected.loc[
+                val1, val2]
+            table_X2_per_cell.loc[val1, val2] = X2_cell
+
+    X2 = table_X2_per_cell.sum().sum()
+    deg_freedom = (len(prob_var1)-1) * (len(prob_var2)-1)
+    p_value = 1 - stats.chi2.cdf(X2, deg_freedom)
+
+    if print_res:
+        conclusion = f"Null Hypothesis - variables are independent. Failed to reject it with alpha={alpha}."
+        if p_value <= alpha:
+            conclusion = f"Null Hypothesis - variables are independent. It is rejected with alpha={alpha}."
+
+        print(f'Chi-square score is {X2:.3f}, p-value is {p_value:.7f}, degrees of freedom: {deg_freedom}')
+        print(conclusion)
+
+    if plot_fig:
+        sns.set(font_scale=font_scale)
+        sns.set_context(font_scale=font_scale)
+
+        fig, axes = plt.subplots(1, 3, figsize=figsize)
+        PlotTools.plot_heatmap(table_observed.astype(float), cmap='YlGnBu',
+                               title=f'Observed', title_fontsize=13, ax=axes[0],
+                               font_scale=font_scale, snsStyle='ticks', xRotation=0,
+                               yRotation=90,
+                               xlabel=var2_name, ylabel=var1_name, colormap_label='',
+                               vmin=None, vmax=None, supress_ticks=True,
+                               annotate_text=True, annotate_fontsize=annotate_fontsize,
+                               annotation_format=".0f",
+                               mask=None, colorbar_ticks=None,
+                               hide_colorbar=False,
+                               xy_labels_fontsize=None,
+                               grid_linewidths=0, grid_linecolor='white',
+                               fix_smaller_rows_at_y_edges_bug=fix_smaller_rows_at_y_edges_bug)
+        PlotTools.plot_heatmap(table_expected.astype(float), cmap='YlGnBu',
+                               title=f'Expected', title_fontsize=13, ax=axes[1],
+                               font_scale=font_scale, snsStyle='ticks', xRotation=0,
+                               yRotation=90,
+                               xlabel=var2_name, ylabel=var1_name, colormap_label='',
+                               vmin=None, vmax=None, supress_ticks=True,
+                               annotate_text=True, annotate_fontsize=annotate_fontsize,
+                               annotation_format=".1f",
+                               mask=None, colorbar_ticks=None,
+                               hide_colorbar=False,
+                               xy_labels_fontsize=None,
+                               grid_linewidths=0, grid_linecolor='white',
+                               fix_smaller_rows_at_y_edges_bug=fix_smaller_rows_at_y_edges_bug)
+        PlotTools.plot_heatmap(table_X2_per_cell.astype(float), cmap='YlGnBu',
+                               title='(O-E)^2 / E', title_fontsize=13, ax=axes[2],
+                               font_scale=font_scale, snsStyle='ticks', xRotation=0,
+                               yRotation=90,
+                               xlabel=var2_name, ylabel=var1_name, colormap_label='',
+                               vmin=None, vmax=None, supress_ticks=True,
+                               annotate_text=True, annotate_fontsize=annotate_fontsize,
+                               annotation_format=".1f",
+                               mask=None, colorbar_ticks=None,
+                               hide_colorbar=False,
+                               xy_labels_fontsize=None,
+                               grid_linewidths=0, grid_linecolor='white',
+                               fix_smaller_rows_at_y_edges_bug=fix_smaller_rows_at_y_edges_bug)
+
+        if p_value is not np.nan:
+            if p_value <= alpha:
+                title = f"P-value is {p_value:.7f}. H0 is rejected with alpha={alpha} - variables are dependent"
+            else:
+                title = f"P-value is {p_value:.7f}. Failed to reject H0 with alpha={alpha} - variables are independent"
+        else:
+            title = 'Cannot determine test result. P-value is nan. Please check'
+
+        fig.suptitle(title)
+        fig.subplots_adjust(top=0.88)
+
+        sns.set(font_scale=1)
+        sns.set_context(font_scale=1)
+
+        return X2, p_value, fig
+    else:
+        return X2, p_value
+
 
 # former getCorrelationForDFColumns
 def get_df_cols_correl(col1, col2, method='pearson', conf_interval=False): # or 'spearman'
@@ -64,7 +280,7 @@ def get_df_cols_correl(col1, col2, method='pearson', conf_interval=False): # or 
         raise ValueError('get_df_cols_correl: unknown method for correlation! Please fix!')
         corr = np.nan
 
-    return(corr)
+    return corr
 
 def spearman_confidence_interval(r, n):
     # https://stats.stackexchange.com/questions/18887/how-to-calculate-a-confidence-interval-for-spearmans-rank-correlation
@@ -615,7 +831,6 @@ def metrics_binary_predictions(y_true, y_pred):
                }
     return metrics
 
-
 def geometric_mean(iterable):
     nums = np.array(iterable)
     return nums.prod()**(1.0/len(nums))
@@ -627,3 +842,54 @@ def rooted_mean_sum_squares(iterable):
     mean_sum_squares = sum_squares / len(nums)
     rooted_mean_sum_squ = np.sqrt(mean_sum_squares)
     return rooted_mean_sum_squ
+
+def showColCounts(column):
+    ''' Gets a column, shows a figure of value counts '''
+    sns.countplot(column,label="Count")
+    plt.show()
+
+def binary_model_log_likelihood(y_true, y_pred):
+    """
+    https://stackoverflow.com/questions/48185090/how-to-get-the-log-likelihood-for-a-logistic-regression-model-in-sklearn
+
+    Example:
+        y_true = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
+        y_pred = np.array([0, 0.1, 0.3, 0.7, 1, 0, 0.1, 0.3, 0.7, 1,])
+
+        log_likelihood_elements:
+        [-9.99200722e-16 -1.05360516e-01 -3.56674944e-01 -1.20397280e+00   -3.45395760e+01
+	    -3.45387764e+01  -2.30258509e+00  -1.20397280e+00  -3.56674944e-01  -9.99200722e-16]
+
+    This example shows what is the log likelihood result per each element: it estimates the distance
+    between the predicted value and the true value.
+
+    The log likelihood of the entire model is the minus of the mean over all elements
+
+    Possible use: McFadden's R^2 - http://thestatsgeek.com/2014/02/08/r-squared-in-logistic-regression/
+
+    @param y_true: np.array of the true labels
+    @param y_pred: np.array of the labels predicted by the model
+    @return: float. The log likelihood of the model
+    """
+    # np.log for y_pred[i]=1 and y_pred[i]=0 is undefined (nan and -inf).
+    # So changing it to 1.e-15 and 0.99999999999 using clip_func
+    clip_func = lambda pred: max(1e-15, min(1 - 1e-15, pred))
+    y_pred_clipped = np.array(list(map(clip_func, y_pred)))
+
+    log_likelihood_elements = y_true * np.log(y_pred_clipped) + (1 - y_true) * np.log(1 - y_pred_clipped)
+    log_likelihood = -np.sum(log_likelihood_elements) / len(y_true)
+
+    assert log_likelihood == log_loss(y_true, y_pred)
+
+    return log_likelihood
+
+def standardize_series(series):
+    """
+    Standardize pd.Series values to standard normal distribution (Z) - Normal distribution with mean 0 and variance 1.
+    @param series: pd.Series numeric
+    @return: pd.Series with standardized values
+    """
+    std = np.nanstd(series)
+    mean = np.nanmean(series)
+    standardizeFunc = lambda x: (x - mean) / std
+    return series.apply(standardizeFunc)

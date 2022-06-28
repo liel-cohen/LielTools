@@ -1,6 +1,5 @@
 import sys
 import numpy as np
-import dill
 import pandas as pd
 import os
 import shutil
@@ -9,6 +8,8 @@ from scipy import sparse
 from scipy.sparse import csr_matrix
 import pickle
 import json
+# import dill # moved this to functions write_var_to_dill and dill_to_var
+
 
 if 'LielTools' in sys.modules:
     from LielTools import DataTools
@@ -32,10 +33,14 @@ def write2Excel(path, data, index=True, csv=False):
         data.to_excel(path, index=index)
 
 def write_var_to_dill(path, variable):
+    import dill
+
     with open(path , 'wb') as d:
         dill.dump(variable, d, protocol=-1)
 
 def dill_to_var(path):
+    import dill
+
     with open(path, 'rb') as fh:
         return dill.load(fh)
 
@@ -50,13 +55,11 @@ def read_txt_to_strings_list(path):
     return str_list
 
 # former readExcel
-def read_excel(path, sheet=0, indexCol=None,engine=None):
-    ''' indexCol - name (string) of the column to be defined as index '''
-    data = pd.read_excel(path, sheet_name=sheet, index_col=indexCol,engine=engine)
-    if len(data.index) != len(data.index.unique()):
-        print('Warning: DF index not unique!')
-
-    return data
+def read_excel(path, sheet=0, indexCol=None):
+    """
+    I moved this function to DataTools. See DataTools.read_excel.
+    """
+    return DataTools.read_excel(path, sheet=sheet, index_col=indexCol)
 
 # former createFolder
 def create_folder(path):
