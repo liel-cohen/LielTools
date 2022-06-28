@@ -572,9 +572,11 @@ def convert_CategoricalToBinary(df):
         categories = encoded_df[col].unique()
         categoriesLen = len(categories)
         if categoriesLen >= 2  and  categoriesLen < 5 and  encoded_df[col].dtype=="object":
-            #drop one column to avoid multicolinearity 
+          
             conversionDict[col] = categories
-            dummy_df = pd.get_dummies(encoded_df[col],drop_first=True,prefix=col)
+            dummy_df = pd.get_dummies(encoded_df[col],prefix=col)
+            #drop one column to avoid multicolinearity drop the last column
+            dummy_df = dummy_df.iloc[:,:-1]
             #drop the original column 
             encoded_df = encoded_df.drop(col,axis=1)
             #concate the df 

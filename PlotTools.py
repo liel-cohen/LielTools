@@ -2376,3 +2376,26 @@ def jitter_dots_pathcollection(dots, offset=0.3):
     # only jitter in the x-direction
     jittered_offsets[:, 0] += np.random.uniform(-offset, offset, offsets.shape[0])
     dots.set_offsets(jittered_offsets)
+
+
+def plot_QQ_plot(df, output_file_path, fig_rows=4, fig_cols=5, figsize=(30, 20),
+                      kde_color='black', rug_color='black', hist_color='g', hist_alpha=0.3,
+                      title='', title_fontsize=18, title_y=1.03):
+    num_columns = df.shape[1]
+    if fig_cols * fig_rows < num_columns:
+        print('plot_columns_dist: number of columns', num_columns, 'is smaller than fig_cols*fig_rows')
+
+    i = 0
+    fig, axes = plt.subplots(fig_rows, fig_cols, figsize=figsize)
+    for row in range(fig_rows):
+        for col in range(fig_cols):
+            if (i < num_columns):
+                if df.iloc[:, i].dtype.name!="object":
+                    fig = sm.qqplot(df.iloc[:, i].to_numpy(), line='45',ax=axes[row, col])
+                    for tick in axes[row, col].get_xticklabels(): tick.set_rotation(45)
+                    axes[row, col].set_ylabel(df.iloc[:, i].name)
+                i = i + 1
+
+    fig.suptitle(title, fontsize=title_fontsize, y=title_y)
+    fig.tight_layout()
+    plt.savefig(output_file_path, bbox_inches='tight')

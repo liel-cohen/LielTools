@@ -8,6 +8,7 @@ remove_values_from_list(sys.path, 'C:\\Users\\liel-\\Dropbox\\PyCharm\\PycharmPr
 
 sys.path.append(r'C:\Users\liel-\Dropbox\PyCharm\PycharmProjectsNew\TCR_dataset_v3')
 sys.path.append(r'C:\Users\lielc\Dropbox\PyCharm\PycharmProjectsNew\TCR_dataset_v3')
+sys.path.append(r'D:\PhD-Tomer\Tools_and_Libraries\LielTools')
 
 import seaborn as sns
 import pandas as pd
@@ -494,7 +495,7 @@ def tune_GLM_elastic_net(fig_path_liel, model_df, y_col_name, x_cols_list, cv_fo
 
     return elastic
 
-def doGLM(df, outcomedf, outcomeVar,predictors, covariates=[], logistic=True):
+def doGLM(df, outcomedf, outcomeVar,predictors, interaction,covariates=[], logistic=True):
     '''
     A function which performs glm analysis on the given input dataframe and outcome df on the list of predictor varaibles 
     given. The funciton also takes into account the any covaraites given for buidling the model.
@@ -520,8 +521,16 @@ def doGLM(df, outcomedf, outcomeVar,predictors, covariates=[], logistic=True):
         family = sm.families.Gaussian()
         coefFunc = lambda x: x
         cols = ['Coef', 'LL', 'UL', 'pvalue', 'Diff', 'N',"ParamConst","ParamBeta"]
+
+    intreactionVar = []
+    if interaction:
+        for c in covariates:
+            intreactionVar.append("intract_"+c)
+            cols.append(c+"_pvalue")
+            cols.append("intract_"+c+"_pvalue")
     
-    cols = cols+covariates
+    
+    cols = cols+covariates+intreactionVar
 
     #ignore if the predictors are unit8(categorical)
     for col in predictors:
@@ -539,6 +548,12 @@ def doGLM(df, outcomedf, outcomeVar,predictors, covariates=[], logistic=True):
         #adjust may be called as covariate or control var
         exogVars = list(set([predc] + covariates))
         tmp = df[exogVars].join(outcomedf).dropna()
+        #adding interaction to the df
+        if interaction:
+            for intvar in intreactionVar:
+                tmp[intvar] = tmp[predc]*df[c]
+                exogVars.append(intvar)
+                
         model = sm.GLM(endog=tmp[outcomeVar].astype(float), exog=sm.add_constant(tmp[exogVars].astype(float)),
                        family=family)
         try:
@@ -552,9 +567,13 @@ def doGLM(df, outcomedf, outcomeVar,predictors, covariates=[], logistic=True):
             outDf.ParamConst[predc] = res.params.get(key="const")
             outDf.ParamBeta[predc] = res.params.get(key=predc)
             for c in covariates:
-                outDf.at[predc,c]=  res.params.get(key=c)
+                outDf.loc[predc,c]=  res.params[c]
+                outDf.loc[predc,c+"_pvalue"] = res.pvalues[c]
+            for i in intreactionVar:
+                outDf.loc[predc,i]=  res.params[i]
+                outDf.loc[predc,i+"_pvalue"] = res.pvalues[i]
            # params.append(res.params.to_dict())
-            pvalues.append(res.pvalues.to_dict())
+            #pvalues.append(res.pvalues.to_dict())
             resObj.append(res)
         except sm.tools.sm_exceptions.PerfectSeparationError:
             outDf.OR[predc] = np.nan
@@ -565,20 +584,24 @@ def doGLM(df, outcomedf, outcomeVar,predictors, covariates=[], logistic=True):
             outDf.ParamConst[predc] = np.nan
             outDf.ParamBeta[predc] = np.nan
             for c in covariates:
-                outDf.at[predc,c]=  np.nan
+                outDf.loc[predc,c]=  np.nan
+                outDf.loc[predc,c+"_pvalue"] = np.nan
+            for i in intreactionVar:
+                outDf.loc[predc,i]=  np.nan
+                outDf.loc[predc,i+"_pvalue"] = np.nan
             #params.append({k: np.nan for k in [predc] + adj})
-            pvalues.append({k: np.nan for k in [predc] + covariates})
+            #pvalues.append({k: np.nan for k in [predc] + covariates})
             resObj.append(None)
             print('PerfectSeparationError: %s with %s' % (predc, outcomeVar))
         outDf.N[predc] = tmp.shape[0]
     
     #outDf['params'] = params
-    outDf['pvalues'] = pvalues
+    #outDf['pvalues'] = pvalues
     outDf['res'] = resObj
     
     return outDf
 
-def GLMAnalysis(dataDf,predictors,outcomeVars=[],covariateVars=[],standardize=True,logistic=True,univariate=True):
+def GLMAnalysis(dataDf,predictors,outcomeVars=[],covariateVars=[],standardize=True,logistic=True,univariate=True,interaction=False):
     """
     A functions which prepares the data for GLM analysis and performs GLM Analysis on the input dataframe
     The function applies normalisation on the input the variables. It splits the df into output and input df.
@@ -614,7 +637,7 @@ def GLMAnalysis(dataDf,predictors,outcomeVars=[],covariateVars=[],standardize=Tr
         if outcome in predictors:
             predictors.remove(outcome)
         #resDf = performGLM(df, outcome, predictors, adj=adjustmentVars, logistic=logistic)
-        resDf = doGLM(df, outcomeDf, outcome,predictors, covariates=covariateVars, logistic=logistic)
+        resDf = doGLM(df, outcomeDf, outcome,predictors, interaction,covariates=covariateVars, logistic=logistic)
 
     #resDf = pd.concat(resL, axis=0, ignore_index=True)
     return resDf
