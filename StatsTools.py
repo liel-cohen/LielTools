@@ -611,16 +611,22 @@ def random_forest_model(df, y_col_name, x_cols_list, num_trees,
     return results_dict
 
 
-def roc_auc(y_true, y_pred, save_path=None, save_auc_txt=None):
+def roc_auc(y_true, y_pred, save_path=None, save_auc_txt=None,plotroc=False):
     assert len(y_true) == len(y_pred)
 
     fpr, tpr, thresholds = roc_curve(y_true, y_pred)
     roc_auc = auc(fpr, tpr)
 
-    fig = plot_roc(roc_auc, fpr, tpr,
+    if plotroc:
+
+        fig = plot_roc(roc_auc, fpr, tpr,
                    save_path=save_path, save_auc_txt=save_auc_txt)
 
-    return {'fig': fig, 'auc': roc_auc,
+        return {'fig': fig, 'auc': roc_auc,
+            'rates': {'false positive rate': fpr,
+                      'true positive rate': tpr}}
+    else:
+        return {'auc': roc_auc,
             'rates': {'false positive rate': fpr,
                       'true positive rate': tpr}}
 

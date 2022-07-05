@@ -14,10 +14,10 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from LielTools_v3 import StatsTools
-from LielTools_v3 import DataTools
-from LielTools_v3 import PlotTools
-from LielTools_v3 import FileTools
+#from LielTools_v3 import StatsTools
+#from LielTools_v3 import DataTools
+#from LielTools_v3 import PlotTools
+#from LielTools_v3 import FileTools
 import random
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold
@@ -196,7 +196,7 @@ def glm_LOO(fig_path_liel, model_df, y_col_name, x_cols_list, model_name, heatma
             alpha=0.001, L1_wt=0.01, heatmap_annotate_text=True, logistic=True):
     res = {}
 
-    FileTools.createFolder(fig_path_liel + '/GLM/{}/'.format(model_name))
+    FileTools.create_folder(fig_path_liel + '/GLM/{}/'.format(model_name))
     cv_folds = 'LOO'
 
     random.seed(42)
@@ -253,8 +253,8 @@ def glm_LOO(fig_path_liel, model_df, y_col_name, x_cols_list, model_name, heatma
 
     plot_predictions(fig_path_liel, obese_GLM_test_res, model_name, title_text)
 
-    FileTools.copy_all_folder_files_to_folder(fig_path_liel + '/GLM/{}/'.format(model_name),
-                                              fig_path_liel + '/GLM/All_models/')
+    FileTools.copy_all_folder_files_to_folder(fig_path_liel + r'\GLM\{}\\'.format(model_name),
+                                              fig_path_liel + r'\GLM\All_models')
 
     return res
 
@@ -337,7 +337,7 @@ def plot_predictions(fig_path_liel, folds_test_res, model_name, title_text):
     # predictions['BMI'] = vac_df_pre['BMI']
     # predictions.sort_values(by='BMI', inplace=True)
 
-    spearman = StatsTools.getCorrelationForDFColumns(predictions['y_true'], predictions['y_pred'],
+    spearman = StatsTools.get_df_cols_correl(predictions['y_true'], predictions['y_pred'],
                                                     method='spearman', conf_interval=True)
     spearman_text = 'y_true vs. y_predicted: Spearman r={}, pval={}'.format(np.round(spearman[0], 3), np.round(spearman[1], 7))
     spearman_df = pd.DataFrame([spearman[0], spearman[1],
@@ -363,17 +363,17 @@ def plot_predictions(fig_path_liel, folds_test_res, model_name, title_text):
         x_jitter = None
 
     fig, ax = plt.subplots(figsize=(10, 7))
-    PlotTools.plotScatter(predictions['y_true'], predictions['y_pred'], pltCorr=False,
-                          figsize=(10, 7), axesTitleFontSize=24, x_jitter=x_jitter,
-                          plotTitle=title_text)
+    PlotTools.plot_scatter(predictions['y_true'], predictions['y_pred'], plt_corr_txt=False,
+                          figsize=(10, 7), axes_title_font_size=24, x_jitter=x_jitter,
+                          plot_title=title_text)
     if logistic:
         labels = [item.get_text() for item in ax.get_xticklabels()]
         labels = [item if (item=='0.0' or item=='1.0' or item=='0' or item=='1') else '' for item in labels]
         ax.set_xticklabels(labels)
 
-    ax.tick_params(axis='both', which='major', labelsize=16)
-    fig.text(0.2, 0.9, spearman_text, fontdict={'size': 18})
-    plt.savefig(fig_path_liel + '/GLM/{}/y_true vs y_predicted _____{}.jpg'.format(model_name,
+    ax.tick_params(axis='both', which='major', labelsize=5)
+    fig.text(0.2, 0.9, spearman_text, fontdict={'size': 10})
+    fig.savefig(fig_path_liel + '/GLM/{}/y_true vs y_predicted _____{}.jpg'.format(model_name,
                                                                                    model_name))
 
 def plot_params(fig_path_liel, folds_res, title_text, model_name,
@@ -385,12 +385,12 @@ def plot_params(fig_path_liel, folds_res, title_text, model_name,
             params_GLM = params_GLM.join(pd.DataFrame(folds_res[i]['model'].params,
                                                       columns=['Model {}'.format(i + 1)]))
 
-    PlotTools.plotHeatmap_real(params_GLM.astype(float), cmap='RdBu_r', figsize=heatmap_figsize,
+    PlotTools.plot_heatmap(params_GLM.astype(float), cmap='RdBu_r', figsize=heatmap_figsize,
                                title=title_text, title_fontsize=21,
-                               font_scale=1.5, snsStyle='ticks',
+                               font_scale=1, snsStyle='ticks',
                                xlabel='CV Model', ylabel='Variable', colormap_label='',
                                vmin=-1, vmax=1,
-                               annotate_text=heatmap_annotate_text, annotate_fontsize=15)
+                               annotate_text=heatmap_annotate_text, annotate_fontsize=5,xy_labels_fontsize=5,yRotation=0,xRotation=90)
     plt.tight_layout()
     plt.savefig(fig_path_liel + '/GLM/{}/params_heatmap____{}.jpg'.format(model_name,
                                                                           model_name))
@@ -404,8 +404,10 @@ def plot_params(fig_path_liel, folds_res, title_text, model_name,
     plt.figure(figsize=bar_figsize)
     sns.barplot(x=params_GLM_stats.index, y=params_GLM_stats.Mean, yerr=params_GLM_stats.Std.values)
     plt.xticks(rotation=90)
+    plt.yticks(rotation=90)
     plt.ylim((-1, 1))
-    plt.rc('xtick', labelsize=12)  # fontsize of the tick labels
+    plt.rc('xtick',labelsize=5)  # fontsize of the tick labels
+    plt.rc('ytick', labelsize=5)
     plt.title(title_text)
     plt.ylabel('Mean Variable Weight in CV Models')
     plt.xlabel('Variable')

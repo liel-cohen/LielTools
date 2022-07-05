@@ -1579,6 +1579,7 @@ def plot_columns_dist(df, output_file_path=None, fig_rows=4, fig_cols=5, figsize
     @param x_rotation:
     @return: matplotlib figure object
     """
+    plt.close('all')
     sns.set(font_scale=font_scale)
     sns.set_style(sns_style)
 
@@ -1601,12 +1602,14 @@ def plot_columns_dist(df, output_file_path=None, fig_rows=4, fig_cols=5, figsize
                 for tick in axes[row, col].get_xticklabels():
                     tick.set_rotation(x_rotation)
                 i = i + 1
+            else:
+                fig.delaxes(axes[row,col])
 
     fig.suptitle(title, fontsize=title_fontsize, y=title_y)
     fig.tight_layout()
 
     if output_file_path is not None:
-        plt.savefig(output_file_path, bbox_inches='tight', dpi=500)
+        fig.savefig(output_file_path, bbox_inches='tight', dpi=500)
 
     return fig
 
