@@ -372,7 +372,10 @@ def renameDFcolumns(df, newNamesDict):
     df = df.copy().rename(columns=newNamesDict)
     return(df)
 
-def list_removeItemIfExists(list1, itemToRemove):
+def list_remove_instance_first_match(list1, itemToRemove):
+    """ Remove itemToRemove from list1 if it exists.
+        Only removes its first instance!
+    """
     listCopy = list1.copy()
 
     try:
@@ -382,15 +385,43 @@ def list_removeItemIfExists(list1, itemToRemove):
 
     return(listCopy)
 
-def list_remove_items_if_exist(list1, items_list):
-    list_copy = list1.copy()
-    for item in items_list:
-        list_copy = list_removeItemIfExists(list_copy, item)
+def list_remove_instance(list1, itemToRemove):
+    """ Remove itemToRemove from list1 if it exists.
+        Removes all of its instances!
+    """
+    new_list = [item for item in list1 if item != itemToRemove]
+    return new_list
 
-    return(list_copy)
+def list_remove_instances_first_match(list1, items_list):
+    """ For each item in items_list:
+        Remove item from list1 if it exists.
+        Only removes its first instance!
+    """
+    new_list = list1.copy()
+    for item in items_list:
+        new_list = list_remove_instance_first_match(new_list, item)
+
+    return new_list
+
+def list_remove_instances(list1, items_list):
+    """ For each item in items_list:
+        Remove item from list1 if it exists.
+        Removes all of its instances!
+    """
+    new_list = list1.copy()
+    for item in items_list:
+        new_list = list_remove_instance(new_list, item)
+
+    return new_list
 
 # former do_lists_contain_same
 def do_lists_contain_same(list1, list2):
+    """
+    Do lists contain the same unique items?
+    @param list1: list
+    @param list2: list
+    @return: Boolean
+    """
     return set(list1) == set(list2)
 
 
@@ -565,3 +596,65 @@ def sum_dict_vals(d):
     for key in d:
         d_sum += d[key]
     return d_sum
+
+def get_max_df_val_row_n_col_names(df):
+    """
+    Gets a pd.DataFrame, and returns the row and column names of the cells with the maximum value in the dataframe.
+    Returns a list with tuples in format (row_name, column_name), and also the maximum value.
+    For example: for input df
+                Yes  No  Maybe
+        Red      50  20   2000
+        Blue   2000  90     90
+        Green    30  99     99
+
+    ( df = pd.DataFrame({'Yes': {'Red': 50, 'Blue': 2000, 'Green': 30}, 'No': {'Red': 20, 'Blue': 90, 'Green': 99}, 'Maybe': {'Red': 2000, 'Blue': 90, 'Green': 99}})  )
+    Function will return:
+        ([('Blue', 'Yes'), ('Red', 'Maybe')], 2000)
+
+    """
+    max_val = df.max().max()
+    max_per_col = df.idxmax() # for each col, get the index of the max val
+
+    max_list = []
+    for col in max_per_col.index: # go over each col and its max val index, and check if it's equal to the df's max val. if so, return them.
+        if df.loc[max_per_col.loc[col], col] == max_val:
+            max_list.append((max_per_col.loc[col], col))
+
+    return max_list, max_val
+
+def reverse_dict_to_dict_w_value_list(d):
+    """
+    Reverses a given dict to a dict with a list of (original) keys as values (for multiple values in the original dict).
+    Example:
+        reverse_dict_to_dict_w_value_list(d)
+        Output: {10: [1], 20: [2], 30: [3, 4]}
+
+    @param d: dict
+    @return: reverse dict
+    """
+    revers_d = {}
+    for x, y in d.items():
+        revers_d.setdefault(y, []).append(x)
+
+    return revers_d
+
+def df_drop_duplicates(df, subset=None, keep='first'):
+    """
+    Get a pandas dataframe, drop duplicate rows, and return a copy of the reduced dataframe
+    as well as the number of rows that were dropped.
+
+    @param df: pandas dataframe
+    @param subset: list of col names or None. Only consider certain columns
+                   for identifying duplicates, by default (None) use all of the columns.
+    @param keep: Determines which duplicates (if any) to keep.
+                - first : Drop duplicates except for the first occurrence.
+                - last : Drop duplicates except for the last occurrence.
+                - False : Drop all duplicates.
+                Default 'first'
+    @return: pandas dataframe, int
+    """
+    rows_before = df.shape[0]
+    df_after = df.drop_duplicates(subset=subset, keep=keep).copy()
+    rows_after = df_after.shape[0]
+
+    return df_after, rows_before-rows_after

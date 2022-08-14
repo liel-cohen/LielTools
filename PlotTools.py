@@ -10,6 +10,7 @@ else:
 import matplotlib.pyplot as plt
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import numpy as np
 import seaborn as sns
 from matplotlib.lines import Line2D
@@ -19,6 +20,7 @@ import random
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colors import Normalize
 from matplotlib.gridspec import GridSpec
+from matplotlib.collections import LineCollection
 import palettable
 import itertools
 from matplotlib.patches import Rectangle
@@ -313,6 +315,9 @@ def plot_boxplot_df(df, stripplot=True, saveFolder=None, figsize=(7, 6),
                     add_mean=False,
                     mean_marker='_', mean_color='red',
                     mean_size=100, mean_linewidth=3, mean_alpha=1,
+                    add_gmean=False,
+                    gmean_marker='_', gmean_color='blue',
+                    gmean_size=100, gmean_linewidth=3, gmean_alpha=1,
                     hide_stripplot_mask=None):
     # hide_stripplot_mask: a mask for df. will not plot a stripplot marker for a cell with True value.
 
@@ -364,6 +369,14 @@ def plot_boxplot_df(df, stripplot=True, saveFolder=None, figsize=(7, 6),
                        c=mean_color, marker=mean_marker, alpha=mean_alpha,
                        zorder=10)
 
+    if add_gmean:
+        for i, col in enumerate(df.columns):
+            gmean = stats.gmean(list(df[col].dropna().astype(float)))
+            if gmean is not None and not np.isnan(gmean):
+                ax.scatter(i, stats.gmean(list(df[col].dropna().astype(float))), s=gmean_size, linewidth=gmean_linewidth,
+                           c=gmean_color, marker=gmean_marker, alpha=gmean_alpha,
+                           zorder=10)
+
     plt.tight_layout()
     if saveFolder is not None:
         fileName = 'Boxplot - ' + xTitle + ' VS ' + yTitle + '.jpg'
@@ -373,7 +386,7 @@ def plot_boxplot_df(df, stripplot=True, saveFolder=None, figsize=(7, 6),
 
     return ax
 
-def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
+def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
                     title='', title_fontsize=13, title_y_padding=0,
                     adjRight=0.8, adjBottom=0.3, adjLeft=None, adjTop=None,
                     row_clustering=True, col_clustering=True,
@@ -421,6 +434,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
 
     :param numbersTable:
     :param cmap:
+    :param norm:
     :param figsize:
     :param title:
     :param title_fontsize:
@@ -550,7 +564,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
     else:
         col_colors = None
 
-    grid = sns.clustermap(numbersTable, cmap=cmap, figsize=figsize,
+    grid = sns.clustermap(numbersTable, cmap=cmap, norm=norm, figsize=figsize,
                           row_cluster=row_clustering, col_cluster=col_clustering,
                           cbar_kws={'label': cbar_title,
                                     'orientation': cbar_orient},
@@ -1114,9 +1128,9 @@ def plotSeriesHistogram(numericSeries, useAxes=None, color='green', grid=False):
     return(useAxes)
 
 
-def plot_barplot_from_series(counts, figsize=(18, 8), title='',  ylabel='',
-                             xrotation=90, annot=True, annot_format="{:.1f}",
-                             annot_fontsize=8):
+def plot_barplot_from_series(counts, figsize=(18, 8), title='', ylabel='', xlabel='',
+                             xrotation=90, yrotation=90, annot=True, annot_format="{:.1f}",
+                             annot_fontsize=8, axes_titles_fontsize=8, axes_ticklabels_fontsize=8, title_fontsize=12):
     """
     Gets a series, plots the values as bars with value annotation.
 
@@ -1139,9 +1153,14 @@ def plot_barplot_from_series(counts, figsize=(18, 8), title='',  ylabel='',
             plt.annotate(annot_format.format(y_vals[i]), xy=(x_vals[i], y_vals[i]),
                          ha='center', va='bottom', fontsize=annot_fontsize)
 
-    plt.ylabel(ylabel)
+    plt.ylabel(ylabel, size=axes_titles_fontsize)
+    plt.xlabel(xlabel, size=axes_titles_fontsize)
+    plt.yticks(rotation=yrotation)
     plt.xticks(rotation=xrotation)
-    plt.title(title)
+    plt.title(title, size=title_fontsize)
+
+    for label in (plt.gca().get_xticklabels() + plt.gca().get_yticklabels()):
+        label.set_fontsize(axes_ticklabels_fontsize)
 
 
 def spaghetti_patients(patientDf, classColumn=None, figsize=(6, 8),
@@ -1214,7 +1233,7 @@ def spaghetti_patients(patientDf, classColumn=None, figsize=(6, 8),
 # former plotScatterHue
 def plot_scatter_hue(series_x, series_y, series_hue=None,
                      save_folder=None, save_full_path=None,
-                     aspect_ratio=1.2, size=7,
+                     aspect_ratio=1.2, fig_height=5,
                      show_reg_line=False, plot_title='',
                      x_title='', y_title='', x_rotation=45,
                      titleFontSize=18, title_color='maroon',
@@ -1242,7 +1261,8 @@ def plot_scatter_hue(series_x, series_y, series_hue=None,
         fig11 = sns.lmplot(DataTools.get_col_name(series_x),
                            DataTools.get_col_name(series_y), data,
                            hue=DataTools.get_col_name(series_hue), fit_reg=show_reg_line,
-                           legend=False, aspect=aspect_ratio, size=size, palette=hue_palette,
+                           legend=False, aspect=aspect_ratio, height=fig_height,
+                           palette=hue_palette,
                            scatter_kws={'linewidths': marker_linewidth,
                                         'edgecolor': marker_edgecolor,
                                         'alpha': marker_alpha,
@@ -1250,7 +1270,8 @@ def plot_scatter_hue(series_x, series_y, series_hue=None,
                            )
     else:                     # no hue
         fig11 = sns.lmplot(DataTools.get_col_name(series_x), DataTools.get_col_name(series_y),
-                           data, fit_reg=show_reg_line, legend=False, aspect=aspect_ratio, size=size,
+                           data, fit_reg=show_reg_line, legend=False,
+                           aspect=aspect_ratio, height=fig_height,
                            scatter_kws={'linewidths': marker_linewidth,
                                         'edgecolor': marker_edgecolor,
                                         'alpha': marker_alpha})
@@ -1548,6 +1569,28 @@ def catergorical_y_with_error(y_categories_series, x_nums_series, x_error_series
     plt.tight_layout()
 
 
+def plot_distplot(vals, ax=None, bins=30, figsize=(30, 20),
+                  kde_color='black', hist_color='g', hist_alpha=0.3,
+                  rug=False, rug_color='black', rug_alpha=0.3,
+                  rug_linewidth=1, rug_height=0.03, font_scale=1,
+                  sns_style='ticks', x_rotation=0):
+    sns.set(font_scale=font_scale)
+    sns.set_style(sns_style)
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    ax = sns.distplot(vals, ax=ax, rug=rug, bins=bins,
+                 kde_kws={"color": kde_color},
+                 rug_kws={"color": rug_color, "alpha": rug_alpha,
+                          "linewidth": rug_linewidth, "height": rug_height},
+                 hist_kws={"color": hist_color, "alpha": hist_alpha},
+                 )
+    for tick in ax.get_xticklabels():
+        tick.set_rotation(x_rotation)
+
+    return ax
+
 def plot_columns_dist(df, output_file_path=None, fig_rows=4, fig_cols=5, figsize=(30, 20),
                       kde_color='black', hist_color='g', hist_alpha=0.3,
                       title='', title_fontsize=18, title_y=1.03, bins=30,
@@ -1581,7 +1624,6 @@ def plot_columns_dist(df, output_file_path=None, fig_rows=4, fig_cols=5, figsize
     """
     sns.set(font_scale=font_scale)
     sns.set_style(sns_style)
-
 
     num_columns = df.shape[1]
     if fig_cols * fig_rows < num_columns:
@@ -1924,15 +1966,6 @@ def clean_axis(ax):
     ax.grid(False)
     ax.set_facecolor('white')
 
-def mapColors2Labels(labels, setStr='Set3', cmap=None):
-    """Return pd.Series of colors based on labels"""
-    if cmap is None:
-        N = max(3,min(12,len(np.unique(labels))))
-        cmap = palettable.colorbrewer.get_map(setStr,'Qualitative',N).mpl_colors
-    cmapLookup = {k:col for k,col in zip(sorted(np.unique(labels)),itertools.cycle(cmap))}
-    return labels.map(cmapLookup.get)
-
-
 def bar_plot_add_value_labels(ax, spacing=2, float_num_digits=2,
                               fontsize=12, value_labels_rotation=0,
                               float_to_percentage=False, color='black',
@@ -1997,67 +2030,6 @@ def bar_plot_add_value_labels(ax, spacing=2, float_num_digits=2,
     ax.set_ylim(ylim_new)
 
 
-''' former getColors4categoricalSeries '''
-def get_colors_4_categorical_series(categ_series, shuffle=False, cmap=None):
-    '''
-    Get color series, mapper and iterator for categorical series.
-    If cmap is None, or doesn't have enough colors, will create random colors (shuffled or not).
-    :param categ_series: A series with categorical / discrete values.
-    :param shuffle: Only relevant if creates random colors.
-    :param cmap: string - matplotlib colormap name.
-    :return: A dictionary:
-        'colorSeries': series of colors corresponding to the original series,
-        'mapper': mapper,
-        'iter': iterator over colors series
-    '''
-    n_classes = len(categ_series.unique())
-
-    # if given cmap name, check if it has a sufficient amount of colors.
-    # If not, don't use it.
-    if cmap is not None:
-        cmap_colors = plt.get_cmap(cmap).colors
-        if n_classes > len(cmap_colors):
-            cmap = None
-
-    if cmap is None:
-        class_color_list = get_colors_list(n_classes, shuffle=shuffle)['colors']
-    else:
-        class_color_list = cmap_colors
-
-    mapper = {i: c for i, c in zip(set(categ_series.astype('category')), class_color_list)}
-    colors = categ_series.map(mapper)
-
-    return({'colorSeries': colors, 'mapper': mapper, 'iter': iter(colors)})
-
-
-# former getColorsList
-def get_colors_list(n_colors, shuffle=False):
-    if type(n_colors) != int:
-        raise Exception('nClasses must be of type int')
-    colors = cm.rainbow(np.linspace(0, 1, n_colors))
-    if shuffle:
-        np.random.shuffle(colors)
-        np.random.shuffle(colors)
-        np.random.shuffle(colors)
-    return({'colors': colors, 'iter': iter(colors)})
-
-''' Gets a series with categorical data. (can be strings / numeric column)
-returns a dict:
-'colorSeries': series of colors corresponding to each data point's class.
-'mapper': value-color dict '''
-def getColors4categoricalSeries_old(catSeries):
-    nClasses = len(set(catSeries.get_values()))
-    classColors = cm.rainbow(np.linspace(0, 1, nClasses))
-    mapper = {i: c for i, c in zip(range(nClasses), classColors)}
-    colors = catSeries.astype('category').cat.codes.map(mapper)
-    return ({'colorSeries': colors, 'mapper': mapper})
-
-
-def categorCmapFromList(colorlist):
-    cmap = plt.cm.jet
-    cmap = cmap.from_list('Custom cmap', colorlist, len(colorlist))
-    return(cmap)
-
 # former addFigCorrelations
 def add_correls_to_fig(figure, col1, col2, font_size=16,
                        plotPearson=True, plotSpearman=True,
@@ -2104,13 +2076,6 @@ def bin_text_to_yes_no(textList):
             textList[0].set_text('Yes')
             textList[1].set_text('No')
     return(textList)
-
-def diverging_cmap_from_list(color_list):
-    cmap = LinearSegmentedColormap.from_list(
-        name='from_color_list',
-        colors=color_list
-        )
-    return cmap
 
 def view_color_bar(cmap):
     import matplotlib.pyplot as plt
@@ -2222,6 +2187,188 @@ def mergeDF4Plotting(data, seriesX, seriesY, xTitle, yTitle, name_index=None):
 #              yerr=std_results_table['std '+args.summary_metric_show].values,fmt='o', markersize=4)
 # plt.show()
 
+
+def compare_tick_labels(axes1, axes2, type='x'):
+    '''
+    Compare tick labels of axes objects axes1 and axes2.
+    If the number of labels or their text (comparing one by one) is unequal,
+    function will throw an assertion error.
+    :param axes1, axes2: matplotlib axes objects
+    :param type: 'x' (use function get_xticklabels) or 'y' (use function get_yticklabels)
+    :return: None.
+    '''
+    if type == 'x':
+        labels1 = axes1.get_xticklabels()
+        labels2 = axes2.get_xticklabels()
+    elif type == 'y':
+        labels1 = axes1.get_yticklabels()
+        labels2 = axes2.get_yticklabels()
+
+    assert len(labels1) == len(labels2), \
+        '{}ticklabel lists have a different length'.format(type)
+    for i in range(len(labels1)):
+        assert labels1[i].get_text() == labels2[i].get_text(), \
+            '{}ticklabels number {} are different!'.format(type, i)
+
+
+def changePltProperties(plotTitle='', titleFontSize=18, xRotation=90,
+                        xTitle=None, yTitle=None, ylim=None,
+                        showLegend=False, legendLabels=None, legendTitle=None,
+                        legendTitleFontSize=16, axesTicksFontSize=14,
+                        legendFontSize=14, axesTitleFontSize=16):
+    plt.title(plotTitle, fontsize=titleFontSize)
+    plt.xticks(rotation=xRotation)
+    if (xTitle is not None):
+        plt.xlabel(xTitle)
+    if (yTitle is not None):
+        plt.ylabel(yTitle)
+    if (ylim is not None):
+        plt.ylim(ylim)
+    if (showLegend & (legendLabels is not None)):
+        plt.legend(legendLabels)
+    if (showLegend & (legendLabels is None)):
+        plt.legend()
+    if (showLegend):
+        plt.axes().legend_.remove()
+        plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., frameon=False)
+
+        legText = plt.axes().get_legend().get_texts()
+        legText = bin_text_to_yes_no(legText)
+        if (legendTitle is not None):
+            plt.axes().get_legend().set_title(legendTitle)
+            plt.setp(plt.axes().get_legend().get_title(), fontsize=legendTitleFontSize)
+
+    plt.rc('xtick', labelsize=axesTicksFontSize)  # fontsize of the tick labels
+    plt.rc('ytick', labelsize=axesTicksFontSize)  # fontsize of the tick labels
+    plt.rc('legend', fontsize=legendFontSize)  # legend fontsize
+    # plt.rc('figure', titlesize=titleFontSize)  # fontsize of the figure title
+    plt.axes().xaxis.label.set_size(axesTitleFontSize)
+    plt.axes().yaxis.label.set_size(axesTitleFontSize)
+
+
+def jitter_dots_pathcollection(dots, offset=0.3):
+    """
+    Gets a matplotlib.collections.PathCollection object,
+    which is the output of the plt.scatter function.
+    Jitters them in the x axis with a uniform distribution range of (-offset, offset).
+    Changes the dots object inplace.
+    :param dots: a matplotlib.collections.PathCollection object
+    :param offset: float used to randomly jitter in the x axis
+    """
+    offsets = dots.get_offsets()
+    jittered_offsets = offsets
+    # only jitter in the x-direction
+    jittered_offsets[:, 0] += np.random.uniform(-offset, offset, offsets.shape[0])
+    dots.set_offsets(jittered_offsets)
+
+def upper_rugplot(data, ax=None, height=.05, color="red", alpha=0.3, linewidth=1):
+    """
+    Add an upper rugplot to a distribution plot.
+    Example use:
+        all_vals = df.values.flatten()
+        all_vals = all_vals[~np.isnan(all_vals)]
+        ax = sns.distplot(all_vals)
+        upper_rugplot(all_vals, ax=ax)
+
+    @param data: numpy array of values
+    @param ax: matplotlib axes to plot the rugplot on
+    @param height: height of the rug lines
+    @param color: str of line color
+    @param alpha: float of line alpha (transparency)
+    @param linewidth: float of linewidth
+    @return: None
+    """
+    ax = ax or plt.gca()
+    segs = np.stack((np.c_[data, data],
+                     np.c_[np.ones_like(data), np.ones_like(data) - height]),
+                    axis=-1)
+    lc = LineCollection(segs, transform=ax.get_xaxis_transform(),
+                        color=color, alpha=alpha, linewidth=linewidth)
+    ax.add_collection(lc)
+
+######### ---------------- Color ----------------- #########
+
+def mapColors2Labels(labels, setStr='Set3', cmap=None):
+    """Return pd.Series of colors based on labels"""
+    if cmap is None:
+        N = max(3,min(12,len(np.unique(labels))))
+        cmap = palettable.colorbrewer.get_map(setStr,'Qualitative',N).mpl_colors
+    cmapLookup = {k:col for k,col in zip(sorted(np.unique(labels)),itertools.cycle(cmap))}
+    return labels.map(cmapLookup.get)
+
+
+''' former getColors4categoricalSeries '''
+def get_colors_4_categorical_series(categ_series, shuffle=False, cmap=None):
+    '''
+    Get color series, mapper and iterator for categorical series.
+    If cmap is None, or doesn't have enough colors, will create random colors (shuffled or not).
+    :param categ_series: A series with categorical / discrete values.
+    :param shuffle: Only relevant if creates random colors.
+    :param cmap: string - matplotlib colormap name.
+    :return: A dictionary:
+        'colorSeries': series of colors corresponding to the original series,
+        'mapper': mapper,
+        'iter': iterator over colors series
+    '''
+    n_classes = len(categ_series.unique())
+
+    # if given cmap name, check if it has a sufficient amount of colors.
+    # If not, don't use it.
+    if cmap is not None:
+        cmap_colors = plt.get_cmap(cmap).colors
+        if n_classes > len(cmap_colors):
+            cmap = None
+
+    if cmap is None:
+        class_color_list = get_colors_list(n_classes, shuffle=shuffle)['colors']
+    else:
+        class_color_list = cmap_colors
+
+    mapper = {i: c for i, c in zip(set(categ_series.astype('category')), class_color_list)}
+    colors = categ_series.map(mapper)
+
+    return({'colorSeries': colors, 'mapper': mapper, 'iter': iter(colors)})
+
+
+# former getColorsList
+def get_colors_list(n_colors, shuffle=False):
+    if type(n_colors) != int:
+        raise Exception('nClasses must be of type int')
+    colors = cm.rainbow(np.linspace(0, 1, n_colors))
+    if shuffle:
+        np.random.shuffle(colors)
+        np.random.shuffle(colors)
+        np.random.shuffle(colors)
+    return({'colors': colors, 'iter': iter(colors)})
+
+
+def getColors4categoricalSeries_old(catSeries):
+    '''
+    Gets a series with categorical data. (can be strings / numeric column)
+    returns a dict:
+    'colorSeries': series of colors corresponding to each data point's class.
+    'mapper': value-color dict '''
+    nClasses = len(set(catSeries.get_values()))
+    classColors = cm.rainbow(np.linspace(0, 1, nClasses))
+    mapper = {i: c for i, c in zip(range(nClasses), classColors)}
+    colors = catSeries.astype('category').cat.codes.map(mapper)
+    return ({'colorSeries': colors, 'mapper': mapper})
+
+
+def categorCmapFromList(colorlist):
+    cmap = plt.cm.jet
+    cmap = cmap.from_list('Custom cmap', colorlist, len(colorlist))
+    return(cmap)
+
+
+def diverging_cmap_from_list(color_list):
+    cmap = LinearSegmentedColormap.from_list(
+        name='from_color_list',
+        colors=color_list
+        )
+    return cmap
+
+
 def get_value_color_from_cmap(value, cmap_name='RdBu_r', vmin=0, vmax=1):
     cmap = cm.get_cmap(cmap_name)
     norm = Normalize(vmin=vmin, vmax=vmax)
@@ -2290,63 +2437,6 @@ def shifted_colormap(cmap_name, minval, maxval, cmap_midpoint, name='shiftedcmap
     return newcmap
 
 
-def compare_tick_labels(axes1, axes2, type='x'):
-    '''
-    Compare tick labels of axes objects axes1 and axes2.
-    If the number of labels or their text (comparing one by one) is unequal,
-    function will throw an assertion error.
-    :param axes1, axes2: matplotlib axes objects
-    :param type: 'x' (use function get_xticklabels) or 'y' (use function get_yticklabels)
-    :return: None.
-    '''
-    if type == 'x':
-        labels1 = axes1.get_xticklabels()
-        labels2 = axes2.get_xticklabels()
-    elif type == 'y':
-        labels1 = axes1.get_yticklabels()
-        labels2 = axes2.get_yticklabels()
-
-    assert len(labels1) == len(labels2), \
-        '{}ticklabel lists have a different length'.format(type)
-    for i in range(len(labels1)):
-        assert labels1[i].get_text() == labels2[i].get_text(), \
-            '{}ticklabels number {} are different!'.format(type, i)
-
-
-def changePltProperties(plotTitle='', titleFontSize=18, xRotation=90,
-                        xTitle=None, yTitle=None, ylim=None,
-                        showLegend=False, legendLabels=None, legendTitle=None,
-                        legendTitleFontSize=16, axesTicksFontSize=14,
-                        legendFontSize=14, axesTitleFontSize=16):
-    plt.title(plotTitle, fontsize=titleFontSize)
-    plt.xticks(rotation=xRotation)
-    if (xTitle is not None):
-        plt.xlabel(xTitle)
-    if (yTitle is not None):
-        plt.ylabel(yTitle)
-    if (ylim is not None):
-        plt.ylim(ylim)
-    if (showLegend & (legendLabels is not None)):
-        plt.legend(legendLabels)
-    if (showLegend & (legendLabels is None)):
-        plt.legend()
-    if (showLegend):
-        plt.axes().legend_.remove()
-        plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., frameon=False)
-
-        legText = plt.axes().get_legend().get_texts()
-        legText = bin_text_to_yes_no(legText)
-        if (legendTitle is not None):
-            plt.axes().get_legend().set_title(legendTitle)
-            plt.setp(plt.axes().get_legend().get_title(), fontsize=legendTitleFontSize)
-
-    plt.rc('xtick', labelsize=axesTicksFontSize)  # fontsize of the tick labels
-    plt.rc('ytick', labelsize=axesTicksFontSize)  # fontsize of the tick labels
-    plt.rc('legend', fontsize=legendFontSize)  # legend fontsize
-    # plt.rc('figure', titlesize=titleFontSize)  # fontsize of the figure title
-    plt.axes().xaxis.label.set_size(axesTitleFontSize)
-    plt.axes().yaxis.label.set_size(axesTitleFontSize)
-
 def color_rgb_to_hexa_string(rgb_tuple, vals_between_0_1=False):
     '''
     Get a tuple (size 3) representing a color with RGB.
@@ -2362,17 +2452,27 @@ def color_rgb_to_hexa_string(rgb_tuple, vals_between_0_1=False):
 
     return '#%02x%02x%02x' % rgb_tuple
 
-def jitter_dots_pathcollection(dots, offset=0.3):
-    """
-    Gets a matplotlib.collections.PathCollection object,
-    which is the output of the plt.scatter function.
-    Jitters them in the x axis with a uniform distribution range of (-offset, offset).
-    Changes the dots object inplace.
-    :param dots: a matplotlib.collections.PathCollection object
-    :param offset: float used to randomly jitter in the x axis
-    """
-    offsets = dots.get_offsets()
-    jittered_offsets = offsets
-    # only jitter in the x-direction
-    jittered_offsets[:, 0] += np.random.uniform(-offset, offset, offsets.shape[0])
-    dots.set_offsets(jittered_offsets)
+
+def get_discrete_colormap(n, cmap='jet'):
+    '''
+    Get n colors from diverging cmap (discretized)
+    https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
+
+    @param n: number of colors
+    @param cmap: string. matplot cmap name
+    @return: cmap, norm
+    '''
+    cmap = plt.get_cmap(cmap)
+
+    # extract all colors from the .jet map
+    cmaplist = [cmap(i) for i in range(cmap.N)]
+
+    # create the new map
+    cmap = mpl.colors.LinearSegmentedColormap.from_list(
+        'Custom cmap', cmaplist, cmap.N)
+
+    # define the bins and normalize
+    bounds = np.linspace(0, n, n+1)
+    norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+
+    return cmap, norm

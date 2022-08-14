@@ -8,6 +8,7 @@ import copy as copy_module
 import matplotlib.pyplot as plt
 import warnings
 from collections import defaultdict
+import math
 
 if 'LielTools' in sys.modules:
     from LielTools import FileTools
@@ -22,6 +23,7 @@ else:
 
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
+import Bio.Data.CodonTable as CodonTable
 
 ####### ------------------ seqTools - general ------------------#### <editor-fold>
 
@@ -50,6 +52,174 @@ aa_one_to_three = {'A': 'ALA', 'C': 'CYS', 'D': 'ASP', 'E': 'GLU',
                    'K': 'LYS', 'L': 'LEU', 'M': 'MET', 'N': 'ASN',
                    'P': 'PRO', 'Q': 'GLN', 'R': 'ARG', 'S': 'SER',
                    'T': 'THR', 'V': 'VAL', 'W': 'TRP', 'Y': 'TYR'}
+
+####### ---------- Reduced alphabet dictionaries (Bio.Alphabet.Reduced (RIP)) -------#### <editor-fold>
+
+''' Reduced alphabet dictionaries from the former Bio.Alphabet.Reduced module (RIP) :
+https://biopython.org/docs/1.75/api/Bio.Alphabet.Reduced.html
+
+The following Alphabet classes are available:
+
+@ Murphy15: Maps 20 amino acids to 15, use murphy_15_tab for conversion,
+ambiguous letters: L: LVIM, F: FY, K: KR
+
+@ Murphy10: Maps 20 amino acids to 10, use murphy_10_tab for conversion,
+ambiguous letters: L: LVIM, S: ST, F: FYW, E: EDNQ, K: KR
+
+@ Murphy8: Maps 20 amino acids to 8, use murphy_8_tab for conversion,
+ambiguous letters: L: LVIMC, A: AG, S: ST, F: FYW, E: EDNQ, K: KR
+
+@ Murphy4: Maps 20 amino acids to 4, use murphy_4_tab for conversion,
+ambiguous letters: L: LVIMC, A: AGSTP, F: FYW, E: EDNQKRH
+
+@ HPModel: Groups amino acids as polar (hydrophilic) or hydrophobic (non-polar), 
+use hp_model_tab for conversion, P: AGTSNQDEHRKP, H: CMFILVWY
+
+@ PC5: Amino acids grouped according to 5 physico-chemical properties,
+use pc_5_table for conversion, A (Aliphatic): IVL, R (aRomatic): FYWH, C (Charged): KRDE, T (Tiny): GACS, D (Diverse): TMQNP
+
+
+The Murphy tables are from here:
+
+Murphy L.R., Wallqvist A, Levy RM. (2000) 
+Simplified amino acid alphabets for protein fold recognition and implications for folding. 
+Protein Eng. 13(3):149-152
+
+*dicts taken from their original code (biopython-1.76):
+https://github.com/2021-environmental-bioinformatics/clean_room/blob/a38c8168ccf777aa50dbb6e6bb2ee1b58e82bdb2/code/biopython-1.76-py3.8-linux-x86_64.egg/Bio/Alphabet/Reduced.py
+
+'''
+
+reduced_alphabet = {'murphy_15': {"L": "L",
+                                 "V": "L",
+                                 "I": "L",
+                                 "M": "L",
+                                 "C": "C",
+                                 "A": "A",
+                                 "G": "G",
+                                 "S": "S",
+                                 "T": "T",
+                                 "P": "P",
+                                 "F": "F",
+                                 "Y": "F",
+                                 "W": "W",
+                                 "E": "E",
+                                 "D": "D",
+                                 "N": "N",
+                                 "Q": "Q",
+                                 "K": "K",
+                                 "R": "K",
+                                 "H": "H"},
+
+                    'murphy_10': {"L": "L",
+                                 "V": "L",
+                                 "I": "L",
+                                 "M": "L",
+                                 "C": "C",
+                                 "A": "A",
+                                 "G": "G",
+                                 "S": "S",
+                                 "T": "S",
+                                 "P": "P",
+                                 "F": "F",
+                                 "Y": "F",
+                                 "W": "F",
+                                 "E": "E",
+                                 "D": "E",
+                                 "N": "E",
+                                 "Q": "E",
+                                 "K": "K",
+                                 "R": "K",
+                                 "H": "H"},
+
+                    'murphy_8': {"L": "L",
+                                "V": "L",
+                                "I": "L",
+                                "M": "L",
+                                "C": "L",
+                                "A": "A",
+                                "G": "A",
+                                "S": "S",
+                                "T": "S",
+                                "P": "P",
+                                "F": "F",
+                                "Y": "F",
+                                "W": "F",
+                                "E": "E",
+                                "D": "E",
+                                "N": "E",
+                                "Q": "E",
+                                "K": "K",
+                                "R": "K",
+                                "H": "H"},
+
+                    'murphy_4': {"L": "L",
+                                "V": "L",
+                                "I": "L",
+                                "M": "L",
+                                "C": "L",
+                                "A": "A",
+                                "G": "A",
+                                "S": "A",
+                                "T": "A",
+                                "P": "A",
+                                "F": "F",
+                                "Y": "F",
+                                "W": "F",
+                                "E": "E",
+                                "D": "E",
+                                "N": "E",
+                                "Q": "E",
+                                "K": "E",
+                                "R": "E",
+                                "H": "E"},
+
+                    'hp_model': {"A": "P",  # Hydrophilic
+                                "G": "P",
+                                "T": "P",
+                                "S": "P",
+                                "N": "P",
+                                "Q": "P",
+                                "D": "P",
+                                "E": "P",
+                                "H": "P",
+                                "R": "P",
+                                "K": "P",
+                                "P": "P",
+                                "C": "H",  # Hydrophobic
+                                "M": "H",
+                                "F": "H",
+                                "I": "H",
+                                "L": "H",
+                                "V": "H",
+                                "W": "H",
+                                "Y": "H"},
+
+                    'pc_5': {"I": "A",  # Aliphatic
+                              "V": "A",
+                              "L": "A",
+                              "F": "R",  # Aromatic
+                              "Y": "R",
+                              "W": "R",
+                              "H": "R",
+                              "K": "C",  # Charged
+                              "R": "C",
+                              "D": "C",
+                              "E": "C",
+                              "G": "T",  # Tiny
+                              "A": "T",
+                              "C": "T",
+                              "S": "T",
+                              "T": "D",  # Diverse
+                              "M": "D",
+                              "Q": "D",
+                              "N": "D",
+                              "P": "D"}
+                    }
+
+
+# <\editor-fold>
+
 
 # former seq_letters_to_other_letters or aaSeq2groupSeq
 def seq_letters_to_other_letters(sequence, letterDict=allAA2_6AAG):
@@ -168,6 +338,254 @@ def str_series_to_char_lists(series):
 
     return [newlist, alphabet]
 
+
+def positions_dict_from_seq(seq, starting_pos=None, ending_pos=None):
+    """
+    Get a dictionary with positions (key) and letters (value) from a string sequence.
+    User can specify a start and end position, and only position between them (inclusive)
+    will be added.
+
+    Examples:
+        In: positions_dict_from_seq('ABCDE')
+        Out: {1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E'}
+
+        In: positions_dict_from_seq('ABCDE', starting_pos=2, ending_pos=4)
+        Out: {2: 'B', 3: 'C', 4: 'D'}
+
+    @param seq: string
+    @param starting_pos: first position to add to dictionary. If None, dictionary starts from the first position.
+    @param ending_pos: last position to add to dictionary. If None, dictionary ends at the last position.
+    @return: dictionary
+    """
+    if starting_pos is None:
+        starting_pos = 1
+    if ending_pos is None:
+        ending_pos = len(seq)
+
+    assert (starting_pos >= 1) and (starting_pos <= len(seq))
+    assert (ending_pos >= 1) and (ending_pos <= len(seq))
+    assert ending_pos >= starting_pos
+
+    seq_dict = {}
+    for index in range(len(seq)):
+        pos = index + 1
+        if (pos >= starting_pos) and (pos <= ending_pos):
+            seq_dict[pos] = seq[index]
+
+    return seq_dict
+
+def codon_dict_by_pos_from_codon_seq(seq, start_from_number=1):
+    """
+    Gets a RNA/DNA sequence of length n (i.e., n/3 codons). Returns a dictionary of position
+    in the protein (key, from 1 to n/3) and codon (value).
+    Example:
+        codon_dict_by_pos_from_codon_seq('TTTACGGGG', start_from_number=1)
+        output: {1: 'TTT', 2: 'ACG', 3: 'GGG'}
+
+        codon_dict_by_pos_from_codon_seq('TTTACGGGG', start_from_number=10)
+        output: {10: 'TTT', 11: 'ACG', 12: 'GGG'}
+
+    @param seq: string. RNA/DNA sequence
+    @param start_from_number: int. Number to start from when numbering the codons. Default 1.
+    @return: dictionary
+    """
+    n = len(seq)
+    assert n % 3 == 0, 'seq length should divide by 3 with no remainder'
+
+    codon_dict = {}
+    for i in range(0, n - n % 3, 3):
+        codon = seq[i : i + 3]
+        pos = math.ceil(i / 3) + start_from_number
+        codon_dict[pos] = codon
+
+    assert len(codon_dict.keys()) == n/3
+
+    return codon_dict
+
+
+def translate_codon_from_table(codon, codon_table=CodonTable.standard_dna_table, stop_letter='*'):
+    """
+    Gets a codon (DNA or RNA 3 letter sequence) and returns an amino acid (1 letter).
+    @param codon: string. (DNA or RNA 3 letter sequence)
+    @param codon_table: a codon table from Bio.Data.CodonTable module. default: CodonTable.standard_dna_table
+    @param stop_letter: letter used to represent a stop codon. default: '*'
+    @return: string - single letter or stop_letter
+    """
+    try:
+        aa = codon_table.forward_table[codon]
+    except:
+        if codon in codon_table.stop_codons:
+            aa = stop_letter
+        else:
+            raise Exception(f'Could not find codon {codon} in forward_table or stop_codons list. Please revise.')
+
+    return aa
+
+
+def get_codon_distances_to_target_aa(orig_codon, target_aa, codon_table=CodonTable.standard_dna_table):
+    """
+    Gets a codon, and a target amino acid letter. Checks the hamming distances between the
+    codon, and the codons translating to the target amino acid. Returns a dictionary
+    with hamming distances as keys (between 1 to 3), and codons with this distance as values.
+    Example:
+        get_codon_distances_to_target_aa('TTT', 'L')
+        Output: {1: ['TTA', 'TTG', 'CTT'],
+                 2: ['CTC', 'CTA', 'CTG']}
+
+            * 'L' is translated by codons ['TTA', 'TTG', 'CTT', 'CTC', 'CTA', 'CTG']
+            * 'TTT' codon translates to 'F'. So, to mutate 'F' to 'L', the minimal number
+              of nucleotide substitutions needed is 1 (to 'TTA', 'TTG' or 'CTT').
+
+    @param orig_codon: string. (DNA or RNA 3 letter sequence)
+    @param target_aa: string. single letter representing an amino acid
+    @param codon_table: a codon table from Bio.Data.CodonTable module. default: CodonTable.standard_dna_table
+    @return: dict
+    """
+    aa_codon_dict = DataTools.reverse_dict_to_dict_w_value_list(codon_table.forward_table)
+
+    hamming_dict = {}
+    for target_codon in aa_codon_dict[target_aa]:
+        hamm = hamming_dist(orig_codon, target_codon)
+        hamming_dict.setdefault(hamm, []).append(target_codon)
+
+    return hamming_dict
+
+def hamming_dist(str1, str2):
+    """ Gets 2 strings and returns their hamming distance.
+    If the strings are not the same length, returns None.
+    :param str1, str2: strings
+    :return: int, or None.
+    """
+    if len(str1) != len(str2):
+        return None
+
+    hamming = 0
+    for i in range(len(str1)):
+        if str1[i] != str2[i]:
+            hamming += 1
+
+    return hamming
+
+import Bio.SubsMat.MatrixInfo as matlist
+
+def get_substitution_matrix(substitut_matrix_name='blosum62'):
+    """
+    Get a substitution matrix from the Bio.SubsMat.MatrixInfo module.
+    @param substitut_matrix_name: The substitution matrix name, out of available matrices in Bio.SubsMat.MatrixInfo.available_matrices:
+                    ['benner6', 'benner22', 'benner74', 'blosum100', 'blosum30', 'blosum35', 'blosum40', 'blosum45',
+                     'blosum50', 'blosum55', 'blosum60', 'blosum62', 'blosum65', 'blosum70', 'blosum75', 'blosum80',
+                     'blosum85', 'blosum90', 'blosum95', 'feng', 'fitch', 'genetic', 'gonnet', 'grant', 'ident',
+                     'johnson', 'levin', 'mclach', 'miyata', 'nwsgappep', 'pam120', 'pam180', 'pam250', 'pam30',
+                     'pam300', 'pam60', 'pam90', 'rao', 'risler', 'structure']
+    @return: dict
+    """
+    sub_mat = getattr(matlist, substitut_matrix_name)
+    return sub_mat
+
+def get_substitution_score_for_2AAs(aa1, aa2, substitut_matrix_name='blosum62'):
+    """
+    Get the substitution score for 2 amino acids, out of a substitution matrix from the Bio.SubsMat.MatrixInfo module.
+    @param aa1: string (upper case single character)
+    @param aa2: string (upper case single character)
+    @param substitut_matrix_name: The substitution matrix name, out of available matrices in Bio.SubsMat.MatrixInfo.available_matrices:
+                    ['benner6', 'benner22', 'benner74', 'blosum100', 'blosum30', 'blosum35', 'blosum40', 'blosum45',
+                     'blosum50', 'blosum55', 'blosum60', 'blosum62', 'blosum65', 'blosum70', 'blosum75', 'blosum80',
+                     'blosum85', 'blosum90', 'blosum95', 'feng', 'fitch', 'genetic', 'gonnet', 'grant', 'ident',
+                     'johnson', 'levin', 'mclach', 'miyata', 'nwsgappep', 'pam120', 'pam180', 'pam250', 'pam30',
+                     'pam300', 'pam60', 'pam90', 'rao', 'risler', 'structure']
+    @return: numeric score
+    """
+    sub_mat = get_substitution_matrix(substitut_matrix_name=substitut_matrix_name)
+    try:
+        score = sub_mat[(aa1, aa2)]
+    except KeyError:
+        try:
+            score = sub_mat[(aa2, aa1)]
+        except:
+            raise Exception(f'{aa1} and {aa2} might not exist in Bio.SubsMat.MatrixInfo.{substitut_matrix_name}. Please check.')
+
+    return score
+
+def get_new_aa_f_mut_str(mut):
+    """
+    Gets a mutation string in format original AA, position, new AA.
+    For example: E484K (original AA - E, position - 484, new AA - K)
+    Returns the new AA (single character string). (In the example: K)
+    @param mut: string
+    @return: string
+    """
+    return mut[-1]
+
+def get_orig_aa_f_mut_str(mut):
+    """
+    Gets a mutation string in format: original AA, position, new AA.
+    For example: E484K (original AA - E, position - 484, new AA - K)
+    Returns the original AA (single character string). (In the example: E)
+    @param mut: string
+    @return: string
+    """
+    return mut[0]
+
+def get_pos_f_mut_str(mut):
+    """
+    Gets a mutation string in format: original AA, position, new AA.
+    For example: E484K (original AA - E, position - 484, new AA - K)
+    Returns the position as an int. (In the example: 484)
+    @param mut: string
+    @return: int
+    """
+    return int(mut[1:-1])
+
+def seq_insert_single_mutation(seq, mut_position, mut_new_char):
+    """
+    Mutate a single character in a given sequence, in a specific given position, into a new given character.
+    For example:
+        Input:  aa_seq_insert_mutation('ABCDEFG', 3, 'X')
+        Output: 'ABXDEFG'
+
+    @param seq: str. sequence to mutate
+    @param mut_position: int. a position to mutate within the sequence
+    @param mut_new_char: str. a single character
+    @return: str. mutated seq
+    """
+    mutated_seq = ''
+    mutated_seq += seq[:mut_position-1]
+    mutated_seq += mut_new_char
+    mutated_seq += seq[mut_position:]
+    return mutated_seq
+
+def check_2seqs_diff(seq1, seq2, print_res=True):
+    """ Gets 2 strings, compares them, returns and prints their differences.
+    If the strings are not the same length, returns None.
+    Differences dictionary format:
+        {position: (character_from_seq1, character_from_seq2)}
+
+    Example:
+        Input:  check_2seqs_diff('AAAAA', 'AaAXB', print_res=True)
+        Output: {2: ('A', 'a'), 4: ('A', 'X'), 5: ('A', 'B')}
+
+    :param seq1, seq2: strings
+    :return: dict, or None.
+    """
+    if len(seq1) != len(seq2):
+        if print_res:
+            print(f'Differences dict: None. Sequences have different lengths!')
+        return None
+
+    diff_dict = dict()
+    hamming = 0
+    for i in range(len(seq1)):
+        if seq1[i] != seq2[i]:
+            hamming += 1
+            diff_dict[i+1] = (seq1[i], seq2[i])
+
+    if print_res:
+        if len(diff_dict) == 0:
+            print(f'Differences dict: {diff_dict}. Sequences are identical!')
+        else:
+            print(f'Differences dict: {diff_dict}')
+
+    return diff_dict
 
 # </editor-fold>
 
@@ -307,7 +725,6 @@ def get_kmers_counts_and_positions(series, k, indices=None,
 
 # def get_kmers_from_seqs_by_class(seq_series, class_series):
 #     classes = list(class_series.unique())
-
 
 
 def create_gapped_list_from_kmer(kmer, gap, gap_symbol='0'):
@@ -454,8 +871,8 @@ def matrix_1H_to_1H(transMap=None, d1AlphabetMap=None, d2AlphabetMap=None):
         d2_letters = list(d2AlphabetMap.keys())
 
     # Remove 0 values
-    d1_letters = DataTools.list_removeItemIfExists(d1_letters, '0')
-    d2_letters = DataTools.list_removeItemIfExists(d2_letters, '0')
+    d1_letters = DataTools.list_remove_instance_first_match(d1_letters, '0')
+    d2_letters = DataTools.list_remove_instance_first_match(d2_letters, '0')
 
     # Make sure filterDict and d1AlphabetMap have the same letters (keys)
     if not DataTools.do_lists_contain_same(transMap.keys(), d1_letters):

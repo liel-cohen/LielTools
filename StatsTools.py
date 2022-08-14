@@ -5,17 +5,28 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import statsmodels.api as sm
 import sys
+import math
+
 from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestRegressor
+
 from sklearn.metrics import roc_curve
 from sklearn.metrics import auc
-from sklearn.ensemble import RandomForestRegressor
-import sklearn.metrics
-from statsmodels.base.elastic_net import RegularizedResultsWrapper
-import math
-from scipy import stats
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
-from scipy.stats import wilcoxon
+from sklearn.metrics import precision_score
+from sklearn.metrics import average_precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import f1_score
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import balanced_accuracy_score
 from sklearn.metrics import log_loss
+import sklearn.metrics
+from scipy import stats
+from scipy.stats import wilcoxon
+from scipy import linalg                  # for linear regression
+from statsmodels.base.elastic_net import RegularizedResultsWrapper
 
 if 'LielTools' in sys.modules:
     from LielTools import DataTools
@@ -788,6 +799,57 @@ def measures_from_2by2_conf_mat(conf_mat):
                }
     return measures
 
+def metrics_multilabel_f_labels(y_true, y_pred, average_type='macro'):
+    """
+    Gets 2 vectors: y_true (true labels), y_pred (predicted labels).
+    Returns a dictionary of different performance metrics.
+
+    Average type: {‘micro’, ‘macro’, ‘samples’, ‘weighted’, ‘binary’, None} default=’macro’
+    This parameter is required for multiclass/multilabel targets.
+    If None, the scores for each class are returned. Otherwise, this determines
+    the type of averaging performed on the data:
+
+    'binary':
+    Only report results for the class specified by pos_label.
+    This is applicable only if targets (y_{true,pred}) are binary.
+
+    'micro':
+    Calculate metrics globally by counting the total true positives,
+    false negatives and false positives.
+
+    'macro':
+    Calculate metrics for each label, and find their unweighted mean.
+    This does not take label imbalance into account.
+
+    'weighted':
+    Calculate metrics for each label, and find their average weighted by support
+    (the number of true instances for each label). This alters ‘macro’ to account
+    for label imbalance; it can result in an F-score that is not between precision and recall.
+
+    'samples':
+    Calculate metrics for each instance, and find their average
+    (only meaningful for multilabel classification where this differs from accuracy_score).
+    """
+    res = {}
+    res['accuracy'] = accuracy_score(y_true, y_pred)
+    res['roc_auc_score'] = roc_auc_score(y_true, y_pred)
+    res['precision'] = precision_score(y_true, y_pred, average=average_type)
+    res['recall'] = recall_score(y_true, y_pred, average=average_type)
+    res['f1'] = f1_score(y_true, y_pred, average=average_type)
+    res['balanced_accuracy'] = balanced_accuracy_score(y_true, y_pred, average=average_type)
+    res['confusion_matrix'] = confusion_matrix(y_true, y_pred)
+    return res
+
+def metrics_multiclass_f_preds(y_true, y_pred):
+    """
+    Gets y_true (true labels), y_pred (predicted scores matrix, shape [n_samples, n_classes]).
+    @return: a dictionary with sklearn roc_auc, average_precision_score
+    """
+    res = {}
+    res['roc_auc'] = roc_auc_score(y_true, y_pred, average='macro')
+    res['average_precision'] = average_precision_score(y_true, y_pred, average='macro')
+    return res
+
 def metrics_binary_predictions(y_true, y_pred):
     """
     :param conf_mat: array, confusion matrix
@@ -893,3 +955,99 @@ def standardize_series(series):
     mean = np.nanmean(series)
     standardizeFunc = lambda x: (x - mean) / std
     return series.apply(standardizeFunc)
+
+#Partial Correlation in Python - from https://github.com/GeostatsGuy/PythonNumericalDemos/blob/master/SubsurfaceDataAnalytics_Feature_Ranking.ipynb
+
+#This uses the linear regression approach to compute the partial correlation
+#(might be slow for a huge number of variables). The algorithm is detailed here:
+
+# http://en.wikipedia.org/wiki/Partial_correlation#Using_linear_regression
+
+#Taking X and Y two variables of interest and Z the matrix with all the variable minus {X, Y},
+#the algorithm can be summarized as
+#    1) perform a normal linear least-squares regression with X as the target and Z as the predictor
+#    2) calculate the residuals in Step #1
+#    3) perform a normal linear least-squares regression with Y as the target and Z as the predictor
+#    4) calculate the residuals in Step #3
+#    5) calculate the correlation coefficient between the residuals from Steps #2 and #4;
+#    The result is the partial correlation between X and Y while controlling for the effect of Z
+
+#Date: Nov 2014
+#Author: Fabian Pedregosa-Izquierdo, f@bianp.net
+#Testing: Valentina Borghesani, valentinaborghesani@gmail.com
+
+def partial_corr(C):
+    #    Returns the sample linear partial correlation coefficients between pairs of variables in C, controlling
+    #    for the remaining variables in C.
+
+    #    Parameters
+    #    C : array-like, shape (n, p)
+    #        Array with the different variables. Each column of C is taken as a variable
+    #    Returns
+    #    P : array-like, shape (p, p)
+    #        P[i, j] contains the partial correlation of C[:, i] and C[:, j] controlling
+    #        for the remaining variables in C.
+
+    C = np.asarray(C)
+    p = C.shape[1]
+    P_corr = np.zeros((p, p), dtype=np.float)
+    for i in range(p):
+        P_corr[i, i] = 1
+        for j in range(i+1, p):
+            idx = np.ones(p, dtype=np.bool)
+            idx[i] = False
+            idx[j] = False
+            beta_i = linalg.lstsq(C[:, idx], C[:, j])[0]
+            beta_j = linalg.lstsq(C[:, idx], C[:, i])[0]
+            res_j = C[:, j] - C[:, idx].dot( beta_i)
+            res_i = C[:, i] - C[:, idx].dot(beta_j)
+            corr = stats.pearsonr(res_i, res_j)[0]
+            P_corr[i, j] = corr
+            P_corr[j, i] = corr
+    return P_corr
+
+def semipartial_corr(C): # Michael Pyrcz modified the function above by Fabian Pedregosa-Izquierdo, f@bianp.net for semipartial correlation
+    C = np.asarray(C)
+    p = C.shape[1]
+    P_corr = np.zeros((p, p), dtype=np.float)
+    for i in range(p):
+        P_corr[i, i] = 1
+        for j in range(i+1, p):
+            idx = np.ones(p, dtype=np.bool)
+            idx[i] = False
+            idx[j] = False
+            beta_i = linalg.lstsq(C[:, idx], C[:, j])[0]
+            res_j = C[:, j] - C[:, idx].dot( beta_i)
+            res_i = C[:, i] # just use the value, not a residual
+            corr = stats.pearsonr(res_i, res_j)[0]
+            P_corr[i, j] = corr
+            P_corr[j, i] = corr
+    return P_corr
+
+def get_class_preds_sklearn_model(model, preds_proba, class_name, raise_exception=True):
+    """
+    Gets a sklearn model, a matrix of predicted probabilities (output from function model.predict_proba)
+    and the class identifier (string/int. according to the model y_train vector).
+    Returns the vector of predictions for the specified class, from preds_proba matrix.
+    If the class is not in the model classes list, will return none or raise an error.
+    @param model: sklearn model object
+    @param preds_proba: predicted class probabilities, output from function model.predict_proba
+    @param class_name: target class identifier (string/int. according to the model y_train vector)
+    @param raise_exception: boolean. Whether to raise an error if the requested class is
+                            not in the model classes list.
+    @return: the vector of predictions for the specified class, from preds_proba
+    """
+    model_classes = model.classes_
+
+    class_ind = None
+    for i, cl in enumerate(model_classes):
+        if cl==class_name:
+            class_ind = i
+
+    if class_ind is not None:
+        return preds_proba[:, class_ind]
+    else:
+        if raise_exception:
+            raise Exception('class_name was not found in the given model classes.')
+        else:
+            return None
