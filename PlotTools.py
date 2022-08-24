@@ -743,6 +743,8 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
             for label_from_list in color_specific_yticklabels:
                 if yticklabel_text == str(label_from_list):
                     yticklabel.set_color(color_specific_color)
+                    yticklabel.set_weight("bold")
+                    
 
     plt.tight_layout()
     if fix_smaller_rows_at_y_edges_bug:
@@ -1553,7 +1555,7 @@ def plot_columns_dist(df, output_file_path=None, fig_rows=4, fig_cols=5, figsize
                       title='', title_fontsize=18, title_y=1.03, bins=30,
                       rug=False, rug_color='black', rug_alpha=0.3,
                       rug_linewidth=1, rug_height=0.03, font_scale=1,
-                      sns_style='ticks', x_rotation=0):
+                      sns_style='ticks', x_rotation=0,plot_with_boder = []):
     """
     Plot a grid of distribution plots - one for each column of a given pandas.Dataframe.
 
@@ -1601,6 +1603,18 @@ def plot_columns_dist(df, output_file_path=None, fig_rows=4, fig_cols=5, figsize
                              )
                 for tick in axes[row, col].get_xticklabels():
                     tick.set_rotation(x_rotation)
+                if df.columns[i] in plot_with_boder:
+                    '''
+                    ax = axes[row,col].axis()
+                    #rec = plt.Rectangle((autoAxis[0]-0.7,autoAxis[2]-0.2),(autoAxis[1]-autoAxis[0])+1,(autoAxis[3]-autoAxis[2])+0.4,fill=False,lw=2)
+                    rec = plt.Rectangle((ax[0] - 0.5, ax[2] - 0.2), (ax[1] - ax[0]) + 1, (ax[3] - ax[2]) + 0.4, fill=False, lw=2, edgecolor="red")
+                    rec = axes[row,col].add_patch(rec)
+                    rec.set_clip_on(False)
+                    '''
+                    axes[row,col].spines['bottom'].set_color('red')
+                    axes[row,col].spines['top'].set_color('red')
+                    axes[row,col].spines['left'].set_color('red')
+                    axes[row,col].spines['right'].set_color('red')
                 i = i + 1
             else:
                 fig.delaxes(axes[row,col])
@@ -1609,7 +1623,7 @@ def plot_columns_dist(df, output_file_path=None, fig_rows=4, fig_cols=5, figsize
     fig.tight_layout()
 
     if output_file_path is not None:
-        fig.savefig(output_file_path, bbox_inches='tight', dpi=500)
+        fig.savefig(output_file_path, bbox_inches='tight', dpi=300)
 
     return fig
 
@@ -1700,11 +1714,15 @@ def plot_boxplot_subplots(df, x_col, y_cols, hue_col=None, output_file_path=None
     for row in range(fig_rows):
         for col in range(fig_cols):
             if (i < num_figs):
+                if x_col == y_cols[i]:
+                    continue
                 plot_boxplot(df[x_col], df[y_cols[i]],
                              seriesHue=None if hue_col is None else df[hue_col],
                              ax=axes[row, col],
                              **boxplot_kwargs)
-                i = i + 1
+            else:
+                fig.delaxes(axes[row,col])
+            i = i + 1
 
     fig.suptitle(title, fontsize=title_fontsize, y=title_y)
     fig.tight_layout()

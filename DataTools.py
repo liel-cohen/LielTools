@@ -650,7 +650,7 @@ def get_DFs_group_by_colname(df,colname = []):
     
     return listDfs
 	
-	def read_excel(path, sheet=0, index_col=None):
+def read_excel(path, sheet=0, index_col=None,keep_default_na = True):
     """
     @param path: str. path of file to be read.
     @param sheet: str or int. sheet to be exported. Default: 0 (first sheet)
@@ -661,9 +661,9 @@ def get_DFs_group_by_colname(df,colname = []):
         df = pd.read_excel(path, sheet_name=sheet, index_col=index_col)
     except:
         try:
-            df = pd.read_excel(path, sheet_name=sheet, index_col=index_col, engine='openpyxl')
+            df = pd.read_excel(path, sheet_name=sheet, index_col=index_col, engine='openpyxl',keep_default_na= keep_default_na)
         except:
-            df = pd.read_excel(path, sheet_name=sheet, index_col=index_col, engine='xlrd')
+            df = pd.read_excel(path, sheet_name=sheet, index_col=index_col, engine='xlrd',keep_default_na = keep_default_na)
     return df
 
 def sum_dict_vals(d):

@@ -55,11 +55,11 @@ def read_txt_to_strings_list(path):
     return str_list
 
 # former readExcel
-def read_excel(path, sheet=0, indexCol=None):
+def read_excel(path, sheet=0, indexCol=None,keep_default_na = True):
     """
     I moved this function to DataTools. See DataTools.read_excel.
     """
-    return DataTools.read_excel(path, sheet=sheet, index_col=indexCol)
+    return DataTools.read_excel(path, sheet=sheet, index_col=indexCol,keep_default_na= keep_default_na)
 
 # former createFolder
 def create_folder(path):
@@ -227,4 +227,8 @@ def json_txt_to_dict(file_path):
     d = json.load(open(file_path))
     return d
 
+def get_latest_folder_from_path(folder_path):
+    lstdir = get_subfolders(folder_path)
+    #paths= [os.path.join(folder_path,basename) for basename in lstdir]
+    return max(lstdir,key=os.path.getctime)
 

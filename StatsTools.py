@@ -642,10 +642,10 @@ def plot_roc(auc, fpr, tpr,
     plt.title(title)
     plt.legend(loc='best')
 
-    PlotTools.savePlt(savePath=save_path, showIfNone=show_if_none)
+    PlotTools.save_plt(save_path=save_path, show_if_none=show_if_none)
     if save_auc_txt is not None:
         FileTools.write_list_to_txt([auc], save_auc_txt)
-
+    plt.close("all")
     return fig
 
 
