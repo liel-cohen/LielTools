@@ -537,7 +537,7 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
                  font_scale=1, snsStyle='ticks', xRotation=0,
                  yRotation=90,
                  xlabel='', ylabel='', colormap_label='',
-                 vmin=None, vmax=None, supress_ticks=True,
+                 vmin=None, vmax=None,center=None, supress_ticks=True,
                  annotate_text=False, annotate_fontsize=8,
                  annotation_format=".2f",
                  mask=None, colorbar_ticks=None,
@@ -550,7 +550,7 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
     if ax is None:
         plt.figure(figsize=figsize, dpi=300)
 
-    ax = sns.heatmap(numbersTable, cmap=cmap, vmin=vmin, vmax=vmax, ax=ax,
+    ax = sns.heatmap(numbersTable, cmap=cmap, vmin=vmin, vmax=vmax,center=center, ax=ax,
                 annot=annotate_text, annot_kws={"size": annotate_fontsize},
                 fmt=annotation_format, mask=mask, cbar=not hide_colorbar,
                 cbar_kws={"ticks": colorbar_ticks},

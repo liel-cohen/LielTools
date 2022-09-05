@@ -699,3 +699,7 @@ def upper_tri_masking(dataframe):
     r = np.arange(m)
     mask = r[:,None] < r
     return A[mask]
+
+def print_df_with_indentation(df,number_of_indetaition=1):
+    sep = "\t"*number_of_indetaition
+    print( sep+ df.to_string().replace("\n","\n"+ sep))
