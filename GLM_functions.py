@@ -25,6 +25,10 @@ import random
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import KFold as sk_KFold
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.feature_selection import SelectFromModel
+from sklearn.ensemble import RandomForestClassifier
 import statsmodels.api as sm
 if 'LielTools' in sys.modules:
     from LielTools import StatsTools
@@ -36,7 +40,8 @@ else:
     import DataTools
     import PlotTools
     import FileTools
-
+import warnings
+warnings.filterwarnings('ignore', '.*did not.*', )
 # Must define variable: fig_path_liel
 
 # elastic net L1_wt should be between 0-1
@@ -194,9 +199,15 @@ def glm_cv_linear(fig_path_liel, model_df, y_col_name, x_cols_list, cv_folds, mo
 #
 #     return res
 
+def get_important_feature(xtrain,ytrain,num_features):
+    fs = SelectFromModel(RandomForestClassifier(n_estimators=1000),threshold=-np.inf,max_features=num_features)
+    fs = fs.fit(xtrain,ytrain)
+    feature_idx = fs.get_support()
+    feature_name = xtrain.columns[feature_idx].tolist()
+    return feature_name
 
 def glm_LOO(fig_path_liel, model_df, y_col_name, x_cols_list, model_name, heatmap_figsize=(12, 8), bar_figsize=(10,8),
-            alpha=0.001, L1_wt=0.01, heatmap_annotate_text=True, logistic=True):
+            alpha=0.001, L1_wt=0.01, heatmap_annotate_text=True, logistic=True,featureSelection=False,num_feature = None):
     res = {}
 
     FileTools.create_folder(fig_path_liel + '/GLM/{}/'.format(model_name))
@@ -212,6 +223,11 @@ def glm_LOO(fig_path_liel, model_df, y_col_name, x_cols_list, model_name, heatma
         ind_train = np.array(ind_train)
         ind_test = np.array([i_index_test])
 
+        if featureSelection:
+            xtrain = model_df.loc[ind_train,x_cols_list]
+            ytrain = model_df.loc[ind_train,y_col_name]
+            x_cols_list = get_important_feature(xtrain,ytrain,num_feature)
+            #use feature selection model to choose features 
         obese_GLM_res_fold = StatsTools.GLM_model(model_df.iloc[ind_train],
                                                   y_col_name, x_cols_list,
                                                   logistic=logistic,
@@ -315,7 +331,7 @@ def glm_LOO(fig_path_liel, model_df, y_col_name, x_cols_list, model_name, heatma
 #     return params_df, title_text
 
 def calc_cv_auc(folds_test_res,auc_plot=False,save_path_plot=None):
-    print('Number of CV folds: ', str(len(folds_test_res)))
+    #print('Number of CV folds: ', str(len(folds_test_res)))
     y_pred_list = []
     y_true_list = []
     y_ind_list = []

@@ -542,8 +542,8 @@ def GLM_model(df, y_col_name, x_cols_list, logistic=True,
         coef_type = 'Coef'
 
     results_dict = {}
-
-    df_no_na = df[[y_col_name] + x_cols_list].dropna()
+   
+    df_no_na = df[[y_col_name]+x_cols_list].dropna()
 
     model = sm.GLM(endog=df_no_na[y_col_name].astype(float),
                    exog=sm.add_constant(df_no_na[x_cols_list].astype(float), has_constant='add'),
