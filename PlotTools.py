@@ -1785,7 +1785,7 @@ def pairplot_with_spearman(df, font_scale=1, spearman_fontsize=10):
     g = sns.pairplot(df)
     g.map(corrfunc)
 
-def parallele_coordinates_plot(df, class_column=None, cmap='Set1', figsize=(8, 5),
+def parallele_coordinates_plot(df, class_column=None, cmap='Set1', colors_list=None, figsize=(8, 5),
                                x_title='', y_title='', axis_title_fontsize=13,
                                plot_markers=True, marker_size=25, marker_type='o',
                                marker_alpha=0.7, marker_linewidth=0,
@@ -1800,6 +1800,8 @@ def parallele_coordinates_plot(df, class_column=None, cmap='Set1', figsize=(8, 5
     :param class_column: string. df column name, of a column with categorical/discrete values.
                          If given, will be used to color the lines according to the class
     :param cmap: string. matplotlib cmap name. Will be used for the class column coloring
+    :param colors_list: list of colors (length of the number of categories).
+                        If cmap is None, these colors will be used.
     :param figsize: tuple.
     :param x_title: string. x axis title to add
     :param y_title: string. y axis title to add
@@ -1818,7 +1820,9 @@ def parallele_coordinates_plot(df, class_column=None, cmap='Set1', figsize=(8, 5
     '''
 
     plt.figure(figsize=figsize)
-    cluster_colors = get_colors_4_categorical_series(df[class_column], cmap=cmap)
+
+    cluster_colors = get_colors_4_categorical_series(df[class_column], cmap=cmap, colors_list=colors_list)
+
     class_order = DataTools.get_ordered_unique_vals_from_list(list(df[class_column]))
     ax = parallel_coordinates(df, class_column,
                               colormap=categorCmapFromList([cluster_colors['mapper'][c] for c in class_order]),
@@ -2316,13 +2320,15 @@ def mapColors2Labels(labels, setStr='Set3', cmap=None):
 
 
 ''' former getColors4categoricalSeries '''
-def get_colors_4_categorical_series(categ_series, shuffle=False, cmap=None):
+def get_colors_4_categorical_series(categ_series, shuffle=False, cmap=None, colors_list=None):
     '''
-    Get color series, mapper and iterator for categorical series.
-    If cmap is None, or doesn't have enough colors, will create random colors (shuffled or not).
+    Returns a color series, mapper and iterator for categorical series.
+    If cmap is None, or doesn't have enough colors, will create random colors (shuffled or not)
+    or use a colors list (if given).
     :param categ_series: A series with categorical / discrete values.
     :param shuffle: Only relevant if creates random colors.
     :param cmap: string - matplotlib colormap name.
+    :param colors_list: list of colors.
     :return: A dictionary:
         'colorSeries': series of colors corresponding to the original series,
         'mapper': mapper,
@@ -2338,7 +2344,10 @@ def get_colors_4_categorical_series(categ_series, shuffle=False, cmap=None):
             cmap = None
 
     if cmap is None:
-        class_color_list = get_colors_list(n_classes, shuffle=shuffle)['colors']
+        if colors_list is None:
+            class_color_list = get_colors_list(n_classes, shuffle=shuffle)['colors']
+        else:
+            class_color_list = colors_list
     else:
         class_color_list = cmap_colors
 
