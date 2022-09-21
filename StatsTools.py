@@ -6,6 +6,8 @@ import seaborn as sns
 import statsmodels.api as sm
 import sys
 import math
+from matplotlib.patches import Rectangle
+from itertools import cycle
 
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestRegressor
@@ -78,6 +80,7 @@ def perform_mann_whitney_u_wilcoxon_rank_sum(series1, series2, alternative='two-
         else:
             print('Data drawn from different distributions (can reject H0)')
 
+    return pval
 
 def perform_wilcoxon_signed_rank(series1, series2, alternative='two-sided', print_res=True, alpha=0.05):
     """
@@ -107,6 +110,7 @@ def perform_wilcoxon_signed_rank(series1, series2, alternative='two-sided', prin
         else:
             print('Data drawn from different distributions (can reject H0)')
 
+    return pval
 
 def perform_shapiro_wilk(data_series, print_res=True, alpha=0.05):
     """
@@ -799,7 +803,99 @@ def measures_from_2by2_conf_mat(conf_mat):
                }
     return measures
 
-def metrics_multilabel_f_labels(y_true, y_pred, average_type='macro'):
+def plot_confusion_matrix(y_true, y_pred, classes_names, add_border_diag=True, add_class_size=False, annot_fontsize=11):
+    """
+    Plots confusion matrix plots (counts and normalized).
+    @param y_true: true labels vector
+    @param y_pred: predicted scores matrix, shape [n_samples, n_classes], from model.predict_proba(X_test)
+    @param classes_names: list of class names with the same order of y_pred columns.
+                          can be output of model.classes_
+    @param add_border_diag: boolean. Whether to add a border around the diagonal values.
+    @return: fig object
+    """
+
+    conf_mat = pd.DataFrame(confusion_matrix(y_true, y_pred),
+                            columns=classes_names, index=classes_names)
+    conf_mat_normed = pd.DataFrame(confusion_matrix(y_true, y_pred, normalize='true'),
+                                   columns=classes_names, index=classes_names)
+    acc = accuracy_score(y_true, y_pred)
+
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(19,8))
+    sns.set_context(font_scale=1.7)
+    sns.heatmap(conf_mat, annot=True, cmap='Blues', fmt='', ax=axes[0], square=True, annot_kws={"size": annot_fontsize})
+    axes[0].set_xlabel('Predicted', fontsize=15)
+    axes[0].set_ylabel('True', fontsize=15)
+    axes[0].set_title(f'Confusion matrix (accuracy = {acc:.3f})', fontsize=17)
+    for tick in axes[0].get_xticklabels():
+        tick.set_rotation(0)
+    if add_class_size:
+        _ = axes[0].set_yticklabels([f'{cla}\n(n={(y_true==cla).sum()})' for cla in classes_names])
+
+    sns.heatmap(conf_mat_normed, annot=True, cmap='Greens', fmt='.2f', ax=axes[1], square=True, annot_kws={"size": annot_fontsize})
+    axes[1].set_title('Confusion matrix, normalized', fontsize=17)
+    axes[1].set_xlabel('Predicted', fontsize=15)
+    axes[1].set_ylabel('True', fontsize=15)
+    for tick in axes[1].get_xticklabels():
+        tick.set_rotation(0)
+    if add_class_size:
+        _ = axes[1].set_yticklabels([f'{cla}\n(n={(y_true==cla).sum()})' for cla in classes_names])
+
+    if add_border_diag:
+        for epi_ind in range(len(classes_names)):
+            axes[0].add_patch(Rectangle((epi_ind, epi_ind), 1, 1, ec='black', fc='none', lw=1.5, clip_on=False))
+            axes[1].add_patch(Rectangle((epi_ind, epi_ind), 1, 1, ec='black', fc='none', lw=1.5, clip_on=False))
+
+    return fig
+
+def plot_roc_curve_multiclass(classes_names, y_true_series, y_pred, colors=None): # TODO might need to debug
+    """
+    @param y_true_series: true labels pd.Series
+    @param y_pred: predicted scores matrix, shape [n_samples, n_classes], from model.predict_proba(X_test)
+    @param classes_names: list of class names with the same order of preds_prob columns.
+                          can be output of model.classes_
+    @param colors: list of colors to use for the classes. If None, assigns colors from list (n=22):
+                  ['red', 'dodgerblue', 'darkviolet', 'lightgreen', 'mediumblue',
+                  'darkorange', 'maroon', 'teal', 'purple', 'green', 'deepskyblue',
+                  'yellowgreen', 'lightcoral', 'gold', 'aqua', 'slateblue', 'sienna',
+                  'magenta', 'darkturquoise', 'lawngreen', 'olive', 'orchid']
+    @return: fig object
+    """
+
+    Y_matrix = pd.get_dummies(y_true_series)
+
+    if colors is None:
+        colors = ['red', 'dodgerblue', 'darkviolet', 'lightgreen', 'mediumblue',
+                  'darkorange', 'maroon', 'teal', 'purple', 'green', 'deepskyblue',
+                  'yellowgreen', 'lightcoral', 'gold', 'aqua', 'slateblue', 'sienna',
+                  'magenta', 'darkturquoise', 'lawngreen', 'olive', 'orchid']
+    colors = cycle(colors)
+
+    # Get curve info for each epitope
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    for i, cla in enumerate(classes_names):
+        fpr[cla], tpr[cla], _ = roc_curve(Y_matrix.loc[:, cla], y_pred[:, i])
+        roc_auc[cla] = auc(fpr[cla], tpr[cla])
+
+    # Plot curves
+    fig = plt.figure(figsize=(8, 6))
+    for cla, color in zip(classes_names, colors):
+        plt.plot(fpr[cla], tpr[cla], color=color, lw=1.5,
+                 label=f'{cla} (AUC = {roc_auc[cla]:0.2f})')
+    plt.plot([0, 1], [0, 1], 'k--', lw=2)
+    plt.xlim([-0.02, 1.0])
+    plt.ylim([0.0, 1.02])
+    plt.xlabel('False Positive Rate', fontsize=15)
+    plt.ylabel('True Positive Rate', fontsize=15)
+    plt.title('Receiver operating characteristic curve for each class vs. all')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
+               frameon=False, title='Class')
+    plt.setp(plt.axes().get_legend().get_title(), fontsize=15)
+
+    return fig
+
+def metrics_multilabel_f_labels(y_true, y_pred, average_type='macro'): # TODO might need to debug
     """
     Gets 2 vectors: y_true (true labels), y_pred (predicted labels).
     Returns a dictionary of different performance metrics.
@@ -840,14 +936,16 @@ def metrics_multilabel_f_labels(y_true, y_pred, average_type='macro'):
     res['confusion_matrix'] = confusion_matrix(y_true, y_pred)
     return res
 
-def metrics_multiclass_f_preds(y_true, y_pred):
+def metrics_multiclass_f_preds(y_true, y_pred): # TODO might need to debug
     """
-    Gets y_true (true labels), y_pred (predicted scores matrix, shape [n_samples, n_classes]).
+    Gets
+    y_true: true labels vector
+    y_pred: predicted scores matrix, shape [n_samples, n_classes], from model.predict_proba(X_test)
     @return: a dictionary with sklearn roc_auc, average_precision_score
     """
     res = {}
     res['roc_auc'] = roc_auc_score(y_true, y_pred, average='macro')
-    res['average_precision'] = average_precision_score(y_true, y_pred, average='macro')
+    res['average_precision'] = average_precision_score(y_true, y_pred, average='macro', multi_class='ovr')
     return res
 
 def metrics_binary_predictions(y_true, y_pred):
@@ -1051,3 +1149,56 @@ def get_class_preds_sklearn_model(model, preds_proba, class_name, raise_exceptio
             raise Exception('class_name was not found in the given model classes.')
         else:
             return None
+
+def binary_vectors_similarity(vec1, vec2):
+    """
+    Gets two binary vectors (numpy arrays dim1) with equal lengths,
+    and returns similarity metrics calculated between them:
+        # a - number of positions where the values of vec1 and vec2 are both 1, meaning 'positive matches'
+        # b - number of positions where the value of vec1=1 and vec2=0 ('vec1 only')
+        # c - number of positions where the value of vec1=0 and vec2=1 ('vec2 only')
+        # d - number of positions where the values of vec1 and vec2 are both 0, meaning 'negative matches'
+
+        # jaccard (a / a+b+c)
+        # hamming distance (b+c)
+        # hamming percentile (b+c / n)
+        # shared_f_vec1 - percentile of shared ones out of vec1 ones (a / a+b)
+        # shared_f_vec2 - percentile of shared ones out of vec2 ones (a / a+c)
+
+    Paper with many more similarity metrics definitions:
+    http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.352.6123&rep=rep1&type=pdf (notice that b and c are swapped in the paper!)
+
+    :param vec1: <class 'numpy.ndarray'>
+    :param vec2: <class 'numpy.ndarray'>
+    :return: metrics (dict) with values:
+             'jaccard', 'hamming', 'hamming_per', 'shared_f_vec1', 'shared_f_vec2', 'a', 'b', 'c', 'd'
+    """
+    assert len(vec1) == len(vec2)
+
+    n = len(vec1)
+    a = 0 # a is the number of positions where the values of vec1 and vec2 are both 1, meaning 'positive matches',
+    b = 0 # b is the number of positions where the value of vec1=1 and vec2=0
+    c = 0 # c is the number of positions where the value of vec1=0 and vec2=1
+    d = 0 # d is the number of positions where the values of vec1 and vec2 are both 0, meaning 'negative matches'
+    for i in range(len(vec1)):
+        if vec1[i] == vec2[i] == 1:
+            a += 1
+        if vec1[i] == 1 and vec2[i] == 0:
+            b += 1
+        if vec1[i] == 0 and vec2[i] == 1:
+            c += 1
+        if vec1[i] == vec2[i] == 0:
+            d += 1
+
+    metrics = {}
+    metrics['a'] = a
+    metrics['b'] = b
+    metrics['c'] = c
+    metrics['d'] = d
+    metrics['jaccard'] = a / (a + b + c)
+    metrics['hamming'] = b + c
+    metrics['hamming_per'] = (b + c) / n
+    metrics['shared_f_vec1'] = a / (a+b)
+    metrics['shared_f_vec2'] = a / (a+c)
+
+    return metrics

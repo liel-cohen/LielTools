@@ -50,9 +50,11 @@ def plot_hist(series, bins=range(0, 60, 5), save_path=None, auto_open=True):
     return fig
 
 def plot_scatter(df, x_col, y_col, x_title=None, y_title=None, hover_data=None, marker_size=8,
-                 line_color='black', line_width=1, ylim=None, xlim=None,
+                 color='teal', color_discrete_map=None, line_color='black', line_width=1,
+                 ylim=None, xlim=None, plotly_template='simple_white',
                  save_to_path_html=None, save_to_path_jpg=None, auto_open=True,
-                 add_line=False, line_x0=0, line_y0=0, line_x1=1, line_y1=1):
+                 add_line=False, line_x0=0, line_y0=0, line_x1=1, line_y1=1,
+                 ):
     """
     Create Plotly scatter plot.
     @param df: pd.DataFrame holding the data.
@@ -62,10 +64,13 @@ def plot_scatter(df, x_col, y_col, x_title=None, y_title=None, hover_data=None, 
     @param y_title: str. y axis title text to add. Default None, then uses y_col.
     @param hover_data: list of strings. Names of columns in df to add to hover. Default None
     @param marker_size: int. size of plot marker. Default 8
+    @param color:
+    @param color_discrete_map:
     @param line_color: color of marker line. Default 'black'
     @param line_width: width of marker line. Default 1
-    @param ylim: [number, number]. limits of y axis limits. Default None (
+    @param ylim: [number, number]. limits of y axis limits. Default None
     @param xlim:
+    @param plotly_template: str, plotly theme. One of: "plotly", "plotly_white", "plotly_dark", "ggplot2", "seaborn", "simple_white", "none"
     @param save_to_path_html:
     @param save_to_path_jpg:
     @param auto_open:
@@ -84,7 +89,10 @@ def plot_scatter(df, x_col, y_col, x_title=None, y_title=None, hover_data=None, 
     fig = px.scatter(df, x=x_col, y=y_col,
                      labels={x_col: x_title,
                              y_col: y_title},
-                     hover_data=hover_data)
+                     hover_data=hover_data,
+                     color=color,
+                     color_discrete_map=color_discrete_map,
+                     template=plotly_template)
     fig.update_traces(marker=dict(size=marker_size, line=dict(width=line_width,
                                                      color=line_color)))
     if add_line:

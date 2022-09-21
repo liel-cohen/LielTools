@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import warnings
 from collections import defaultdict
 import math
+import matplotlib
 
 if 'LielTools' in sys.modules:
     from LielTools import FileTools
@@ -24,6 +25,8 @@ else:
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 import Bio.Data.CodonTable as CodonTable
+from Bio import Align
+from Bio.Align import substitution_matrices
 
 ####### ------------------ seqTools - general ------------------#### <editor-fold>
 
@@ -52,6 +55,8 @@ aa_one_to_three = {'A': 'ALA', 'C': 'CYS', 'D': 'ASP', 'E': 'GLU',
                    'K': 'LYS', 'L': 'LEU', 'M': 'MET', 'N': 'ASN',
                    'P': 'PRO', 'Q': 'GLN', 'R': 'ARG', 'S': 'SER',
                    'T': 'THR', 'V': 'VAL', 'W': 'TRP', 'Y': 'TYR'}
+
+# </editor-fold>
 
 ####### ---------- Reduced alphabet dictionaries (Bio.Alphabet.Reduced (RIP)) -------#### <editor-fold>
 
@@ -218,8 +223,88 @@ reduced_alphabet = {'murphy_15': {"L": "L",
                     }
 
 
-# <\editor-fold>
+# </editor-fold>
 
+####### ---------- General -------#### <editor-fold>
+
+def seq_series_to_char_df(series):
+    """
+    Transform a series of strings into a dataframe with a column
+    for each character.
+
+    Example:
+        seq_series_to_char_df(pd.Series(['ABCDEF-1', 'ABC-D-G2']))
+
+        Out:
+           0  1  2  3  4  5  6  7
+        0  A  B  C  D  E  F  -  1
+        1  A  B  C  -  D  -  G  2
+
+    @param series: pd.Series
+    @return: pd.DataFrame
+
+    """
+    if len(series.map(len).value_counts()) > 1:
+        warnings.warn('Series sequences have different lengths. Missing characters will be stored in dataframe as None')
+    return pd.DataFrame(series.apply(list).tolist(), index=series.index)
+
+def concat_df_string_cols_to_single_col(df, cols=None):
+    """
+    Concatenate multiple column values into a single dataframe (for each row).
+    Example:
+        df_examp = pd.DataFrame([['AB', 'CD', 'EF'], ['11', '22', '33']], columns=['a', 'b', 'c'])
+        df_examp
+        Out[1]:
+                a   b   c
+            0  AB  CD  EF
+            1  11  22  33
+
+        concat_df_string_cols_to_single_col(df_examp, ['a', 'b'])
+        Out[2]:
+            0    ABCD
+            1    1122
+
+    @param df: pandas dataframe
+    @param cols: a list with the names of columns to concatenate. If None, concatenate all df columns.
+    @return: pandas series
+    """
+    if cols is None:
+        cols = df.columns
+    return df[cols].apply(lambda row: ''.join(row.values.astype(str)), axis=1)
+
+
+def remove_gapped_position_from_seqs(series, gap_char='-'):
+    """
+    Gets a series of sequences of the same length.
+    Checks each position for gap_char. If all sequences have the gap_char
+    at a certain position, remove that position from all sequences.
+    Example:
+        series = pd.Series(['ARDFYE------GSFDI', 'ARGEGSP----GNWFDP', 'ARDFYE------DPQWF'])
+        series
+            Out[1]:
+                0    ARDFYE------GSFDI
+                1    ARGEGSP----GNWFDP
+                2    ARDFYE------DPQWF
+                dtype: object
+        remove_gapped_position_from_seqs(series, gap_char='-')
+            Out[2]:
+                0    ARDFYE--GSFDI
+                1    ARGEGSPGNWFDP
+                2    ARDFYE--DPQWF
+                dtype: object
+
+    @param series: pd.Series
+    @param gap_char: the character considered as "gap"
+    @return: pd.Series
+    """
+    # separate sequences to chars
+    series_split = seq_series_to_char_df(series)
+    # drop cols that only contain the gap_char
+    cols_to_drop = (series_split == gap_char).sum(axis=0) == series_split.shape[0]
+    series_split = series_split.drop(columns=[ind for ind in cols_to_drop.index if cols_to_drop.loc[ind]==True])
+    # reconcatenate chars to string
+    series_shorter = concat_df_string_cols_to_single_col(series_split)
+    return series_shorter
 
 # former seq_letters_to_other_letters or aaSeq2groupSeq
 def seq_letters_to_other_letters(sequence, letterDict=allAA2_6AAG):
@@ -589,6 +674,136 @@ def check_2seqs_diff(seq1, seq2, print_res=True):
 
 # </editor-fold>
 
+####### ---------- Alignment -------#### <editor-fold>
+
+''' for info on biopython's alignment module see:
+https://biopython.org/docs/1.76/api/Bio.pairwise2.html?highlight=globalms
+https://biopython.org/docs/1.76/api/Bio.Align.html
+'''
+
+def align_seqs_series_to_longest_seq(seqs_series=None, seqs_list=None, aligner=None, print_alignment=False):
+    """
+    Align sequences to the longest sequence, by pairwise aligning each sequence
+    to the longest sequence separately, using Biopython's aligner with high
+    penalties for opening gaps in the query sequence (longest sequence).
+    Can get a pd.Series of sequences *or* a list of sequences. Returnes a pandas
+    dataframe with original and gapped sequences.
+
+    @param: seqs_series: a pd.Series object with sequences. Default None (can get seqs_series *or* seqs_list)
+    @param: seqs_list: a list of sequences. Default None (can get seqs_series *or* seqs_list)
+    @param: aligner: a biopython aligner object to use. If not given, will automotically
+                     create an aligner with high penalties for opening gaps in the query sequence.
+    return: (1) a pandas dataframe with 2 columns: original sequences, aligned sequences.
+            ordered by original sequences order.
+            (2) the longest sequence used as a query sequence.
+    """
+    if seqs_series is None and seqs_list is None:
+        raise Exception('Must get seqs_series or seqs_list. None of them were given.')
+    if seqs_series is not None and seqs_list is not None:
+        raise Exception('Must get seqs_series or seqs_list, not both')
+    if seqs_series is not None:
+        assert type(seqs_series) is pd.Series, f'Given seqs_series must be type pd.Series. Given seqs_series type: {type(seqs_series)}'
+    if seqs_list is not None:
+        assert type(seqs_list) is list, f'Given seqs_list must be type list. Given seqs_list type: {type(seqs_list)}'
+        seqs_series = pd.Series(seqs_list, name='orig_seq')
+
+    # get col names
+    col_name = seqs_series.name
+    aligned_col_name = col_name + ' aligned'
+
+    # sort sequences by length and get the longest one
+    seqs = seqs_series.copy()
+    seqs = seqs.loc[seqs.map(len).sort_values(ascending=False).index]
+    longest_seq = seqs.loc[seqs.index[0]]
+
+    # prepare as dataframe to insert aligned sequences
+    seqs = pd.DataFrame(seqs)
+    seqs[aligned_col_name] = None
+    seqs['longest seq aligned'] = None
+
+    # prepare aligner object
+    if aligner is None:
+        aligner = Align.PairwiseAligner()
+        aligner.mode = 'global'
+        aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
+        aligner.open_gap_score = 0
+        aligner.extend_gap_score = 0
+        aligner.query_end_gap_score = -30
+        aligner.query_internal_open_gap_score = -30
+        aligner.query_internal_extend_gap_score = -30
+        aligner.query_left_open_gap_score = -30
+        aligner.query_left_extend_gap_score = -30
+        aligner.query_right_open_gap_score = -30
+        aligner.query_right_extend_gap_score = -30
+
+    seqs.loc[seqs.index[0], aligned_col_name] = longest_seq
+    seqs.loc[seqs.index[0], 'longest seq aligned'] = longest_seq
+
+    for index in seqs.index[1:]:
+        alignments = aligner.align(longest_seq, seqs.loc[index, col_name])
+        alignment = list(alignments)[0]
+        if print_alignment:
+            print(alignment)
+
+        formatted_alignment = alignment._format_pretty()
+        seqA_aligned = formatted_alignment.split('\n')[0]
+        seqB_aligned = formatted_alignment.split('\n')[-2]
+        seqs.loc[index, 'longest seq aligned'] = seqA_aligned
+        seqs.loc[index, aligned_col_name] = seqB_aligned
+
+    num_length_as_longest = (seqs[aligned_col_name].map(len) == len(longest_seq)).sum()
+    if num_length_as_longest != seqs.shape[0]:
+        print(f'Out of {seqs.shape[0]} sequences, {num_length_as_longest} aligned sequences are of length equal to the longest sequence ({len(longest_seq)}).')
+    else:
+        print('All aligned sequences are of length equal to the longest sequence.')
+
+    return seqs.loc[seqs_series.index], longest_seq
+
+# </editor-fold>
+
+####### ------------------ Logoplot ------------------#### <editor-fold>
+
+def create_PSSM(seqs_series): # Elinor's function (repaired)
+    ''' All sequences must have the same length! '''
+    seps_len = len(seqs_series.iloc[0])
+    amino_acid_list=["A","R","N","D","C","E","Q","G","H","I","L","K","M","P","S","T","W","Y","F","V"]
+    counts={}#dictionary for creating df key is the aa and value is the frequency
+    for letter in amino_acid_list:
+        counts[letter] = [0.0] * seps_len
+    for pos in range(seps_len):
+        for aa in amino_acid_list:
+            counts[aa][pos]=[pep[pos] for pep in seqs_series].count(str(aa))/len(seqs_series)
+    df_counts = pd.DataFrame(counts)
+    df_counts["position"]=[i for i in range(1,seps_len+1)]
+    df_counts.set_index("position", inplace=True)
+    return df_counts
+
+def make_logo_plot(seq_series, fig_title='', figsize=(6, 3), ax=None):
+    ''' All sequences must have the same length! '''
+
+    if not 'logomaker' in sys.modules:
+        import logomaker
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    seq_len = seq_series.map(len).max()
+    # counts_df = logomaker.alignment_to_matrix(sequences=seq_series, to_type='counts', characters_to_ignore='-X') # Elinor says it has some bug
+    counts_df = create_PSSM(seq_series)
+    plt.grid(b=None)
+    logo = logomaker.Logo(counts_df, color_scheme='weblogo_protein',
+                   font_name='Arial Rounded', stack_order='small_on_top',
+                   ax=ax)
+    logo.ax.xaxis.set_major_locator(matplotlib.ticker.FixedLocator(range(0, seq_len+1)))
+    logo.ax.set_xticklabels(range(0, seq_len+1))
+    logo.ax.set_xlabel('Position', fontsize=14)
+    logo.ax.set_ylabel("Counts", labelpad=-1, fontsize=14)
+    logo.ax.set_title(fig_title, fontsize=16)
+    plt.grid(False)
+    plt.tight_layout()
+
+# </editor-fold>
+
 ####### ------------------ seqTools - kmers ------------------#### <editor-fold>
 
 # former get_all_possible_kmers
@@ -791,7 +1006,7 @@ def strSeries2_1H(stringSeries, charEncoder=None, padding=True, gaps=False):
         to the the stringSeries alphabet'''
     import keras
 
-    charEncoderWasGiven = charEncoder is not None
+    return_charEncoder = charEncoder is None
 
     # keras.utils.to_categorical does not support samples with different lengths! Must pad.
     if padding: # pad sequences
@@ -808,7 +1023,8 @@ def strSeries2_1H(stringSeries, charEncoder=None, padding=True, gaps=False):
         encoderAlphabetMap = charEncoder.getEncoderMappingDict()
         alphabetCheck = set(alphabet)
         alphabetFromMap = set(encoderAlphabetMap.keys())
-        if padding and not gaps: alphabetCheck.add('0')
+        if padding and not gaps:
+            alphabetCheck.add('0')
         if set(alphabetCheck) != alphabetFromMap:
             raise Exception('Warning: stringSeries letters arent identical to given charEncoder letters!')
 
@@ -824,10 +1040,77 @@ def strSeries2_1H(stringSeries, charEncoder=None, padding=True, gaps=False):
             raise Exception('Problem here! Encoder char zero must be mapped to the last int!')
         oneHot = oneHot[:, :, 0:(paddingCol)]
 
-    if charEncoderWasGiven:
-        return oneHot
-    else:
+    if return_charEncoder:
         return [oneHot, charEncoder]
+    else:
+        return oneHot
+
+def strSeries2_1H_sklearn(stringSeries, charEncoder=None, padding=True, gaps=False):
+    from sklearn.preprocessing import LabelEncoder
+    from sklearn.preprocessing import OneHotEncoder
+
+    ''' Gets a pd.Series of strings, with length n. Maximum string length l.
+    Can also get an encoder that fits the strings alphabet. Alphabet size d.
+    Returns an ndarray with the shape: (n, l, d).
+    If padding=True, will add padding at the end of sequences so they all
+    have the same length (max length in the series).
+    If gaps=True, will consider '0's as gaps.
+    If padding=True or gaps=True, delete the '0' character from the one hot matrix.
+    If charEncoder is given, makes sure the charEncoder alphabet is identical
+    to the the stringSeries alphabet'''
+
+    return_charEncoder = charEncoder is None
+
+    if padding: # pad sequences
+        stringSeries = pad_str_series(stringSeries.copy())
+
+    # stringSeries to char lists
+    charlists, alphabet = str_series_to_char_lists(stringSeries)
+
+    if charEncoder is None:
+        # get an encoder (into integers) for the stringSeries alphabet
+        charEncoder, encoderAlphabetMap = getChar2intEncoder(alphabet)
+    else:
+        # make sure the given encoder's alphabet fits the stringSeries alphabet
+        encoderAlphabetMap = charEncoder.getEncoderMappingDict()
+        alphabetCheck = set(alphabet)
+        alphabetFromMap = set(encoderAlphabetMap.keys())
+        if padding and not gaps:
+            alphabetCheck.add('0')
+        if set(alphabetCheck) != alphabetFromMap:
+            raise Exception('Warning: stringSeries letters arent identical to given charEncoder letters!')
+
+    # use encoder to encode chars to ints (for each sample) - getting a 2d matrix
+    integer_encoded = charLists2intEncoding(charlists, charEncoder)
+
+    # encode to integers
+    onehot_encoder = OneHotEncoder(sparse=False)
+    integer_encoded = integer_encoded.reshape(integer_encoded.shape[0], integer_encoded.shape[1], 1)
+
+    # encoding integers to one-hot - fit encoder
+    integer_encoded_ints = np.array(list(encoderAlphabetMap.values())) # get list of ints that need to be encoded
+    integer_encoded_ints = integer_encoded_ints.reshape(integer_encoded_ints.shape[0], 1)
+
+    onehot_encoder.fit(integer_encoded_ints)
+
+    # apply encoder to sequences (from integer encoded sequences)
+    onehot_encoded_list = []
+    for i in range(0, integer_encoded.shape[0]):
+        onehot_encoded_list.append(onehot_encoder.transform(integer_encoded[i]))
+
+    oneHot = np.array(onehot_encoded_list)
+
+    if padding or gaps: # delete the 0 encoding column (if amino acids - column 20)
+        paddingCol = len(encoderAlphabetMap)-1
+        if encoderAlphabetMap['0'] != paddingCol:  # Check.
+            raise Exception('Problem here! Encoder char zero must be mapped to the last int!')
+        oneHot = oneHot[:, :, 0:(paddingCol)]
+
+    if return_charEncoder:
+        return [oneHot, charEncoder]
+    else:
+        return oneHot
+
 
 
 def oneHot_add0encodingColumn(oneHot):

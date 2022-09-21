@@ -55,10 +55,25 @@ def write_seqs_to_fasta_file(sequences, fasta_path):
     Writes a list of sequence records to a fasta file.
     @param sequences: List  of sequence records (biopython SeqRecord objects)
     @param fasta_path: Path of fasta file to write the sequences to
-    @return:
+    @return: None
     """
     with open(fasta_path, "w") as output_handle:
         SeqIO.write(sequences, output_handle, "fasta")
+
+def write_seqs_series_to_fasta(seq_series, fasta_path):
+    """
+    Writes a series of sequences to a fasta file. Each sequence in the fasta
+    file will be named by its sequence series index.
+    @param seq_series: pandas series of sequences
+    @param fasta_path: Path of fasta file to write the sequences to
+    @return: None
+    """
+    seq_list = []
+    for i in seq_series.index:
+        seq = seq_series.loc[i]
+        seq_list.append(Bio.SeqRecord.SeqRecord(Bio.Seq.Seq(seq), id=i))
+
+    write_seqs_to_fasta_file(seq_list, fasta_path)
 
 
 def fasta_seq_length_hist(fasta_path, output_format='series', print_hist=False):

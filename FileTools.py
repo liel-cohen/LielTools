@@ -86,6 +86,19 @@ def makedirs(path):
         if not os.path.isdir(path):
             raise
 
+def get_parent_dir(path=None):
+    """
+    Get parent directory path of a given path.
+    If not given any path, returns the parent directory path of the environment
+    current working directory.
+    @param path: path string
+    @return: path string
+    """
+    if path is None:
+        path = os.getcwd()
+    return os.path.dirname(path)
+
+
 def excel2dict(path, sheet=0, colKey=None, colVal=None):
     ''' if colKey and colVal = None:
      first excel column = keys

@@ -395,6 +395,8 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
                     xy_labels_fontsize=None,
 
                     mask=None,
+                    annotate_text=False, annotate_fontsize=8,
+                    annotation_format=".2f",
 
                     cbar_title='', cbar_orient='vertical',
                     cbar_pos=None,
@@ -411,6 +413,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
                     row_color_lab_legend_ncol=4, row_color_labels_cmap='Set1',
                     row_color_labels_cmap_dict=None, row_color_labels_order=None,
                     row_color_legend_frameon=True,
+                    row_color_legend_bbox=None,
 
                     col_color_vals=None, col_cmap='Blues',
                     col_vmin=None, col_vmax=None,
@@ -419,6 +422,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
                     col_color_lab_legend_ncol=4, col_color_labels_cmap='Set1',
                     col_color_labels_cmap_dict=None, col_color_labels_order=None,
                     col_color_legend_frameon=True,
+                    col_color_legend_bbox=None,
 
                     rowcol_color_legend_fontsize=10, rowcol_color_legend_title='',
                     rowcol_color_legend_title_fontsize=11,
@@ -461,7 +465,8 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
     :param cbar_orient: 'vertical' or 'horizontal'
     :param cbar_title_fontsize: colormap title font size
     :param cbar_ticks_fontsize: colormap tick labels font size
-    :param cbar_pos: colorbar position
+    :param cbar_pos: colorbar position. format [left, bottom, width, height],
+                     as output of grid.ax_cbar.get_position().bounds
     :param cbar_vertical_left: bool. If True, sets cbar vertically to the left
                                of the entire heatmap (ignoring cbar_pos)
     :param cbar_vertical_left_x_factor: float between 0 and 1. A factor that determines the
@@ -481,6 +486,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
 
     :param row_color_labels: Series with (categorical) labels for rows.
     :param mask: which cells not to show (will show empty cell - not colored)
+    :param annotate_text:
     :param row_color_lab_legend: boolean - show legend of row colors
     :param row_color_lab_legend_loc: row color legend location (in heatmap axes).
                                      string or pair of floats.
@@ -492,6 +498,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
     :param row_color_labels_cmap_dict: row color dictionary of colors per labels
     :param row_color_labels_order: row color legend display order (list of labels)
     :param row_color_legend_frameon: show legend frame (True / False)
+    :param row_color_legend_bbox: legend bbox_to_anchor
     @ Same params for col exist as well!
     :param rowcol_color_legend_fontsize: legend font size for row/col colors
     :param rowcol_color_legend_title: legend title for row/col colors
@@ -523,7 +530,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
             row_colors = row_cmap(row_color_vals.values)
 
         return pd.Series(row_colors.tolist(), index=row_color_vals.index,
-                                              name=row_color_vals.name)
+                         name=row_color_vals.name)
 
     # row side colors
     if row_color_vals is not None:
@@ -539,8 +546,8 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
     elif row_color_labels is not None:
         if row_color_labels_cmap_dict is None:
             row_color_labels_cmap_dict = dict(zip(set(row_color_labels),
-                                    sns.mpl_palette(row_color_labels_cmap,
-                                                    n_colors=len(set(row_color_labels)))))
+                                                  sns.mpl_palette(row_color_labels_cmap,
+                                                                  n_colors=len(set(row_color_labels)))))
             if len(row_color_labels_cmap_dict) != len(set(row_color_labels)):
                 raise Exception('row_color_labels_cmap - cmap doesnt have enough colors for all values.\nPlease use another cmap.')
 
@@ -572,6 +579,8 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
                           mask=mask, vmin=vmin, vmax=vmax,
                           linewidths=linewidths, linecolor=linecolor,
                           yticklabels=yticklabels, xticklabels=xticklabels,
+                          annot=annotate_text, annot_kws={"size": annotate_fontsize},
+                          fmt=annotation_format
                           )
 
     if fix_smaller_rows_at_y_edges_bug:
@@ -585,7 +594,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
 
         if col_clustering or (col_color_labels is not None):
             grid.ax_col_dendrogram.set_title(title, fontdict={'fontsize': title_fontsize,
-                                                       'fontweight': 'bold'}, pad=title_y_padding)
+                                                              'fontweight': 'bold'}, pad=title_y_padding)
         else:
             grid.ax_heatmap.set_title(title, fontdict={'fontsize': title_fontsize,
                                                        'fontweight': 'bold'}, pad=title_y_padding)
@@ -631,13 +640,14 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
             row_color_labels_order = row_color_labels.unique()
         for label in row_color_labels_order:
             grid.ax_col_dendrogram.bar(0, 0, color=row_color_labels_cmap_dict[label],
-                                    label=label, linewidth=0)
+                                       label=label, linewidth=0)
         grid.ax_col_dendrogram.legend(loc=row_color_lab_legend_loc,
                                       ncol=row_color_lab_legend_ncol,
                                       prop={"size": rowcol_color_legend_fontsize},
                                       title=rowcol_color_legend_title,
                                       title_fontsize=rowcol_color_legend_title_fontsize,
-                                      frameon=row_color_legend_frameon)
+                                      frameon=row_color_legend_frameon,
+                                      bbox_to_anchor=row_color_legend_bbox)
 
     # col side colors legend
     if col_color_labels is not None and col_color_lab_legend:
@@ -645,10 +655,14 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
             col_color_labels_order = col_color_labels.unique()
         for label in col_color_labels_order:
             grid.ax_col_dendrogram.bar(0, 0, color=col_color_labels_cmap_dict[label],
-                                    label=label, linewidth=0)
+                                       label=label, linewidth=0)
         grid.ax_col_dendrogram.legend(loc=col_color_lab_legend_loc,
-                                   ncol=col_color_lab_legend_ncol,
-                                   frameon=col_color_legend_frameon)
+                                      ncol=col_color_lab_legend_ncol,
+                                      prop={"size": rowcol_color_legend_fontsize},
+                                      title=rowcol_color_legend_title,
+                                      title_fontsize=rowcol_color_legend_title_fontsize,
+                                      frameon=col_color_legend_frameon,
+                                      bbox_to_anchor=col_color_legend_bbox)
 
     # Source: https://stackoverflow.com/questions/62533046/how-to-add-color-border-or-similar-highlight-to-specifc-element-of-heatmap-in-py
     # Add frames to columns
@@ -684,11 +698,14 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
     if col_colors is not None:
         grid.ax_col_colors.tick_params(left=False, bottom=False, top=False, right=False)
 
-
-    # get colormap bounds (x pos, y pos, x size, y size)
+    # get heatmap bounds (x pos, y pos, x size, y size)
     # grid.ax_heatmap.get_position().bounds
 
+    # get cbar bounds (x pos, y pos, x size, y size)
+    # grid.ax_cbar.get_position().bounds
+
     return grid
+
 
 # former plotHeatmap_real
 def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
@@ -1041,7 +1058,7 @@ def DFbarPlot(data, columns=None,
               stacked=False,
               add_value_labels=False, float_num_digits=2,
               value_labels_fontsize=12, value_labels_rotation=0,
-              savePath=None, color_list=None
+              savePath=None, color_list=None, value_labels_spacing=2
               ):
     if type(data) is pd.Series:
         data = pd.DataFrame(data)
@@ -1052,7 +1069,7 @@ def DFbarPlot(data, columns=None,
     if plotOnaxes is not None: # if an axes was provided, use axes
         data[columns].plot.bar(stacked=stacked, grid=grid,
                                figsize=figsize, ax=plotOnaxes,
-                               width=width)
+                               width=width, color=color_list)
         plotOnaxes.set_title(plotTitle, fontsize=titleFontSize)
         for tick in plotOnaxes.get_xticklabels():
             tick.set_rotation(xRotation)
@@ -1110,7 +1127,8 @@ def DFbarPlot(data, columns=None,
             bar_plot_add_value_labels(plt.axes(),
                              float_num_digits=float_num_digits,
                              fontsize=value_labels_fontsize,
-                             value_labels_rotation=value_labels_rotation)
+                             value_labels_rotation=value_labels_rotation,
+                             spacing=value_labels_spacing)
         plt.tight_layout()
         save_plt(save_path=savePath)
 
