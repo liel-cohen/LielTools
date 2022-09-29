@@ -9,7 +9,6 @@ else:
 
 import matplotlib.pyplot as plt
 import pandas as pd
-import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import seaborn as sns
@@ -392,7 +391,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
                     row_clustering=True, col_clustering=True,
                     font_scale=1, snsStyle='ticks', vmin=None, vmax=None,
                     xlabel='', ylabel='', xRotation=0, yRotation=0,
-                    xy_labels_fontsize=None,
+                    xy_labels_fontsize=None, square=False,
 
                     mask=None,
                     annotate_text=False, annotate_fontsize=8,
@@ -461,6 +460,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
     :param xRotation:
     :param yRotation:
     :param xy_labels_fontsize: x and y axis title font size
+    :param square: boolean. If True, set the Axes aspect to “equal” so each cell will be square-shaped
     :param cbar_title:
     :param cbar_orient: 'vertical' or 'horizontal'
     :param cbar_title_fontsize: colormap title font size
@@ -486,7 +486,16 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
 
     :param row_color_labels: Series with (categorical) labels for rows.
     :param mask: which cells not to show (will show empty cell - not colored)
-    :param annotate_text:
+    :param annotate_text: boolean indicating whether to annotate text over the heatmap,
+                          or matrix with the same dimensions as data to annotate over the heatmap.
+                          If True, write the data value in each cell.
+                          If an array-like with the same shape as data,
+                          then use this to annotate the heatmap instead of the data.
+                          Note that DataFrames will match on position, not index.
+    :param annotation_format: string. format of the text for annotation over the heatmap.
+                              For example, if numeric, '.2f' means show 2 digits after the point.
+                              For a given string matrix in annotate_text, annotation_format
+                              should be ''.
     :param row_color_lab_legend: boolean - show legend of row colors
     :param row_color_lab_legend_loc: row color legend location (in heatmap axes).
                                      string or pair of floats.
@@ -580,7 +589,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
                           linewidths=linewidths, linecolor=linecolor,
                           yticklabels=yticklabels, xticklabels=xticklabels,
                           annot=annotate_text, annot_kws={"size": annotate_fontsize},
-                          fmt=annotation_format
+                          fmt=annotation_format, square=square,
                           )
 
     if fix_smaller_rows_at_y_edges_bug:
@@ -711,7 +720,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
 def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
                  title='', title_fontsize=13, ax=None,
                  font_scale=1, snsStyle='ticks', xRotation=0,
-                 yRotation=90,
+                 yRotation=90, square=False,
                  xlabel='', ylabel='', colormap_label='',
                  vmin=None, vmax=None, supress_ticks=True,
                  annotate_text=False, annotate_fontsize=8,
@@ -734,7 +743,7 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
     ax = sns.heatmap(numbersTable, cmap=cmap, vmin=vmin, vmax=vmax, ax=ax,
                 annot=annotate_text, annot_kws={"size": annotate_fontsize},
                 fmt=annotation_format, mask=mask, cbar=not hide_colorbar,
-                cbar_kws={"ticks": colorbar_ticks},
+                cbar_kws={"ticks": colorbar_ticks}, square=square,
                 linewidths=grid_linewidths, linecolor=grid_linecolor)
     ax.set_title(title, fontdict={'fontsize': title_fontsize,
                                   'fontweight': 'bold'})
@@ -894,7 +903,12 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
                         dot_color='grey', violin_alpha=0.8,
                         stripplot_alpha=0.3, boxplot_width=0.3,
                         dots_x_offset=0.002, order=None, x_rotation=0,
-                        xy_title_fontsize=12, font_scale=1, violin_cut=2):
+                        xy_title_fontsize=12, font_scale=1, violin_cut=2,
+                        hide_indices_in_stripplot=None,
+                        connect_pairs=None, pairs_dot_color='grey', pairs_dot_size=20,
+                        pairs_dot_linewidth=0, pairs_dot_alpha=0.3, pairs_dot_marker='o',
+                        pairs_line_color='grey', pairs_line_alpha=0.7, pairs_line_linewidth=1, pairs_linestyle='-'
+                        ):
     """
     Plot a violin plot with a boxplot and stripplot on top.
 
@@ -926,8 +940,12 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
                                           density past the extreme datapoints.
                                           Set to 0 to limit the violin range within the range
                                           of the observed data
+    :param hide_indices_in_stripplot: list of df indices to exclude from stripplot
+    :param connect_pairs: list of pairs (tuples) of indices. If stripplot=True and cut_in_half=False,
+                          will connect the stripplot markers of each pair with a line.
     :return: axes object
     """
+
     plt.close('all')
     sns.set(font_scale=font_scale)
     sns.set_style('white')
@@ -953,20 +971,67 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
             violin.set_clip_path(plt.Rectangle((x0-(width/10), y0), (width/10)+(width / 2), height,
                                                transform=ax.transData))
 
-    # boxplot
+    ### boxplot
     sns.boxplot(y=y, x=x, data=df, saturation=1, showfliers=False,
                 width=boxplot_width, boxprops={'zorder': 3, 'facecolor': 'none'},
                 ax=ax, order=order)
     old_len_collections = len(ax.collections)
 
-    # stripplot
+    ### stripplot
     if stripplot:
-        sns.stripplot(y=y, x=x, data=df, color=dot_color, ax=ax, order=order,
+
+        # if going to use connect_pairs, must make sure that the pair indices are in hide_indices_in_stripplot
+        if connect_pairs is not None and cut_in_half is False:
+            indices_in_pairs = [item for pair in connect_pairs for item in pair] # flatten connect_pairs to ind list
+
+            if hide_indices_in_stripplot is None:
+                hide_indices_in_stripplot = indices_in_pairs
+            else:
+                for ind in indices_in_pairs:
+                    if ind not in hide_indices_in_stripplot:
+                        hide_indices_in_stripplot.append(ind)
+
+        # get data for stripplot
+        stripplot_data = df.copy()
+        if hide_indices_in_stripplot is not None:
+            stripplot_data = DataTools.get_df_without_indices(stripplot_data,
+                                                              hide_indices_in_stripplot)
+        # plot
+        sns.stripplot(y=y, x=x, data=stripplot_data, color=dot_color, ax=ax, order=order,
                       alpha=stripplot_alpha, jitter=jitter, size=dot_size)
         if cut_in_half:
             for dots in ax.collections[old_len_collections:]: # set offset - only in the boxplot half
                 dots.set_offsets(dots.get_offsets() +
                                  np.array([jitter + dots_x_offset + dot_size/200, 0]))
+
+        ### Add lines between paired data points
+        if connect_pairs is not None and cut_in_half is False:
+            for ind1, ind2 in connect_pairs:
+                pair_pos = {}
+
+                # add marker for both data points
+                for ind_to_color in [ind1, ind2]:
+                    xticklabel_found = False
+                    for i, xticklabel in enumerate(ax.get_xticklabels()):
+                        xticklabel_text = xticklabel.get_text()
+
+                        if str(df.loc[ind_to_color, x]) == xticklabel_text:
+                            xticklabel_found = True
+                            pair_pos[ind_to_color] = {'x': i+(jitter*(random.random()-0.5)),
+                                                      'y': df.loc[ind_to_color, y]}
+                            ax.scatter(pair_pos[ind_to_color]['x'], pair_pos[ind_to_color]['y'],
+                                       s=pairs_dot_size, linewidth=pairs_dot_linewidth, c=pairs_dot_color,
+                                       marker=pairs_dot_marker, alpha=pairs_dot_alpha, zorder=10)
+
+                    if xticklabel_found is False:
+                        raise Exception(f'Did not find an xticklabel_text that matches index {ind_to_color}! Please check why.')
+
+                # add a line between the two markers
+                ax.plot([pair_pos[ind1]['x'], pair_pos[ind2]['x']],
+                        [pair_pos[ind1]['y'], pair_pos[ind2]['y']],
+                        color=pairs_line_color, linewidth=pairs_line_linewidth,
+                        linestyle=pairs_linestyle, alpha=pairs_line_alpha, zorder=10)
+
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
 
@@ -984,6 +1049,7 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
     ax.xaxis.label.set_size(fontsize=xy_title_fontsize)
 
     return ax
+
 
 def plot_boxplot_hue_stats_text(df, x_col_name, y_col_name, hue_col_name,
                                 test='Mann-Whitney', comparisons_correction=None,
@@ -1039,9 +1105,8 @@ def plot_boxplot_hue_stats_text(df, x_col_name, y_col_name, hue_col_name,
     return ax
 
 
-
 ''' gets counts data column/s and creates a bar plot '''
-def DFbarPlot(data, columns=None,
+def DFbarPlot_old(data, columns=None,
               figsize=(6, 4),
               plotTitle='',
               plotOnaxes=None,
@@ -1082,9 +1147,35 @@ def DFbarPlot(data, columns=None,
         if (legendLabels is not None):
             plotOnaxes.legend(legendLabels)
         if (showLegend==False):
-            plotOnaxes.get_legend().remove()
+            if plotOnaxes.get_legend() is not None:
+                plotOnaxes.get_legend().remove()
+        else:
+            plotOnaxes.legend_.remove()
+            plotOnaxes.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., frameon=False,
+                              fontsize=legendFontSize)
+
+            legText = plotOnaxes.get_legend().get_texts()
+            legText = bin_text_to_yes_no(legText)
+            if (legendTitle is not None):
+                plotOnaxes.get_legend().set_title(legendTitle)
+                plt.setp(plotOnaxes.get_legend().get_title(),
+                         fontsize=legendTitleFontSize)
+
+        xticksText = plotOnaxes.get_xticklabels()
+        xticksText = bin_text_to_yes_no(xticksText)
+        plotOnaxes.set_xticklabels(xticksText)
+
+        plotOnaxes.tick_params(axis='both', which='major', labelsize=axesTicksFontSize)
+        plotOnaxes.xaxis.label.set_size(axesTitleFontSize)
+        plotOnaxes.yaxis.label.set_size(axesTitleFontSize)
+
         if add_value_labels:
-            bar_plot_add_value_labels(plotOnaxes)
+            bar_plot_add_value_labels(plotOnaxes,
+                                      float_num_digits=float_num_digits,
+                                      fontsize=value_labels_fontsize,
+                                      value_labels_rotation=value_labels_rotation,
+                                      spacing=value_labels_spacing)
+
     else:                       # if not, use plt
         data[columns].plot.bar(stacked=stacked, grid=grid,
                                figsize=figsize, legend=None,
@@ -1134,6 +1225,85 @@ def DFbarPlot(data, columns=None,
 
     return(figNew)
 
+def DFbarPlot(data, columns=None, figsize=(6, 4), plotTitle='',
+              ax=None, xTitle=None, yTitle=None, ylim=None, xRotation=45, width=0.8,
+              showLegend=True, legendLabels=None, legendTitle=None,
+              grid=False, titleFontSize=22,
+              axesTitleFontSize=18, axesTicksFontSize=16,
+              legendFontSize=16, legendTitleFontSize=17,
+              stacked=False,
+              add_value_labels=False, float_num_digits=2,
+              value_labels_fontsize=12, value_labels_rotation=0,
+              savePath=None, color_list=None, value_labels_spacing=2,
+              plotOnaxes=None):
+    if ax is None and plotOnaxes is not None: # retain backwards compatability for plotOnaxes (renamed to ax)
+        ax = plotOnaxes
+
+    if type(data) is pd.Series:
+        data = pd.DataFrame(data)
+
+    if columns is None:
+        columns = data.columns
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    data[columns].plot.bar(stacked=stacked, grid=grid,
+                           figsize=figsize, ax=ax,
+                           width=width, color=color_list)
+
+    ax.set_title(plotTitle, fontsize=titleFontSize)
+
+    for tick in ax.get_xticklabels():
+        tick.set_rotation(xRotation)
+
+    if xTitle is not None:
+        ax.set_xlabel(xTitle)
+
+    if yTitle is not None:
+        ax.set_ylabel(yTitle)
+
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
+    if showLegend is False:
+        if ax.get_legend() is not None:
+            ax.get_legend().remove()
+    else:
+        ax.legend_.remove()
+        if legendLabels is not None:
+            ax.legend(legendLabels,
+                      bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
+                      frameon=False, fontsize=legendFontSize)
+        else:
+            ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
+                      frameon=False, fontsize=legendFontSize)
+
+        legText = ax.get_legend().get_texts()
+        legText = bin_text_to_yes_no(legText)
+        if (legendTitle is not None):
+            ax.get_legend().set_title(legendTitle)
+            plt.setp(ax.get_legend().get_title(),
+                     fontsize=legendTitleFontSize)
+
+    xticksText = ax.get_xticklabels()
+    xticksText = bin_text_to_yes_no(xticksText)
+    ax.set_xticklabels(xticksText)
+
+    ax.tick_params(axis='both', which='major', labelsize=axesTicksFontSize)
+    ax.xaxis.label.set_size(axesTitleFontSize)
+    ax.yaxis.label.set_size(axesTitleFontSize)
+
+    if add_value_labels:
+        bar_plot_add_value_labels(ax, float_num_digits=float_num_digits,
+                                  fontsize=value_labels_fontsize,
+                                  value_labels_rotation=value_labels_rotation,
+                                  spacing=value_labels_spacing)
+
+    plt.tight_layout()
+    save_plt(save_path=savePath)
+
+    return ax
 
 def plotSeriesHistogram(numericSeries, useAxes=None, color='green', grid=False):
     if useAxes is None:
@@ -1347,7 +1517,7 @@ def plot_scatter(x_series, y_series,
                  plt_corr_txt=True, plot_pearson=True, plot_spearman=True,
                  plot_title='', x_title='', y_title='',
                  font_scale=1, sns_style='ticks',
-                 markers_color='teal', markers_alpha=0.6,
+                 markers_color='teal', markers_alpha=0.6, markers_size=30,
                  x_rotation=45, title_font_size=18, corr_font_size=14,
                  title_color='maroon', xticks=None,
                  axes_title_font_size=14,
@@ -1355,7 +1525,8 @@ def plot_scatter(x_series, y_series,
                  ylim=None, xlim=None,
                  correl_text_x_loc=0.2, correl_text_y_loc=0.96,
                  save_folder=None, save_full_path=None,
-                 x_log_scale=False, y_log_scale=False):
+                 x_log_scale=False, y_log_scale=False,
+                 color_list=None):
     """
 
     @param x_series: pd.Series. x values series.
@@ -1371,7 +1542,7 @@ def plot_scatter(x_series, y_series,
     @param y_title: str. y axis label to use instead of the y series name.
     @param font_scale: number. Seaborn fontscale. Default 1
     @param sns_style: str. Seaborn style. Default 'ticks'
-    @param markers_color: markers color. Default 'teal'
+    @param markers_color: markers color. Default 'teal' (color_list overrides it if not None)
     @param markers_alpha: markers alpha (opacity, between 0-1). Default 0.6
     @param x_rotation: x tick labels rotation (0-360). Default 45
     @param title_font_size: title font size. Default 18
@@ -1387,10 +1558,9 @@ def plot_scatter(x_series, y_series,
     @param correl_text_y_loc: Float. Starting position of the correlation text in the y axis. Default 0.96
     @param save_folder: str. Folder to save the figure (file name determined automatically). Default None
     @param save_full_path: str. Full path to save the figure. Default None
+    @param color_list: list of strings. A list with a color for each datapoint (by their order). Overrides markers_color
     @return:
     """
-
-
     sns.set(font_scale=font_scale)
     sns.set_style(sns_style)
 
@@ -1399,12 +1569,17 @@ def plot_scatter(x_series, y_series,
     if x_title== '': x_title = DataTools.get_col_name(x_series)
     if y_title== '': y_title = DataTools.get_col_name(y_series)
 
+    if color_list is None:
+        scatter_kws = {'alpha': markers_alpha, 's': markers_size}
+    else:
+        scatter_kws = {'alpha': markers_alpha, 'color': color_list, 's': markers_size}
+
     fontTitle = {'size': title_font_size, 'color': title_color, 'weight': 'bold'}
     fig11 = sns.regplot(x=data[DataTools.get_col_name(x_series)],
                         y=data[DataTools.get_col_name(y_series)],
-                        ax=ax, color=markers_color, fit_reg=show_reg_line,
+                        ax=ax, fit_reg=show_reg_line, color=markers_color,
                         x_jitter=x_jitter, y_jitter=y_jitter,
-                        scatter_kws={'alpha': markers_alpha})
+                        scatter_kws=scatter_kws)
 
     if plt_corr_txt:
         add_correls_to_fig(fig11, data[DataTools.get_col_name(x_series)],
@@ -1785,11 +1960,15 @@ def pairplot_with_spearman(df, font_scale=1, spearman_fontsize=10):
     g = sns.pairplot(df)
     g.map(corrfunc)
 
-def parallele_coordinates_plot(df, class_column=None, cmap='Set1', colors_list=None, figsize=(8, 5),
+def parallele_coordinates_plot(df, class_column=None, categorical=True,
+                               cmap='Set1', colors_list=None, figsize=(8, 5),
+                               fig_title='', fig_title_fontsize=13,
                                x_title='', y_title='', axis_title_fontsize=13,
+                               ticks_fontsize=11,
                                plot_markers=True, marker_size=25, marker_type='o',
                                marker_alpha=0.7, marker_linewidth=0,
                                line_alpha=0.7, legend_title='', legend_frameon=False,
+                               legend_title_fontsize=13, legend_fontsize=11,
                                xticks_rotation=0, y_gridlines=True):
     '''
     Plots a parallele coordinates plot from a pandas.DataFrame columns.
@@ -1797,46 +1976,79 @@ def parallele_coordinates_plot(df, class_column=None, cmap='Set1', colors_list=N
     Can also add markers - can be important when there are many missing data points.
 
     :param df: pandas.DataFrame. Each column will get an x axis value in the plot.
-    :param class_column: string. df column name, of a column with categorical/discrete values.
-                         If given, will be used to color the lines according to the class
+    :param class_column: string. df column name, of a column with categorical/numeric values.
+                         If given, will be used to color the lines according to the class.
+    :param categorical: bool. Whether the class_column is categorical (True - will add a color legend)
+                              or numeric (False - will add a colorbar)
     :param cmap: string. matplotlib cmap name. Will be used for the class column coloring
     :param colors_list: list of colors (length of the number of categories).
                         If cmap is None, these colors will be used.
     :param figsize: tuple.
+    :param fig_title: string. Figure title (default='')
+    :param fig_title_fontsize: Figure title fontsize
     :param x_title: string. x axis title to add
     :param y_title: string. y axis title to add
     :param axis_title_fontsize: x/y axis title fontsize
-    :param plot_markers: boolean. True = plot markers
+    :param ticks_fontsize: x/y axis ticks fontsize
+    :param plot_markers: boolean. True = plot markers. Supported only for categorical = True
     :param marker_size: int. marker size
     :param marker_type: string. marker type ('o', 'x', etc.)
     :param marker_alpha: float between 0-1. markers opacity
     :param marker_linewidth: numeric. markers edge width
     :param line_alpha: float between 0-1. lines opacity
-    :param legend_title: string. legend title to add
+    :param legend_title: string. legend/colorscale title to add
     :param legend_frameon: boolean. add frame to legend or not
+    :param legend_title_fontsize: int. Legend/colorscale title fontsize
+    :param legend_fontsize: int. Legend/colorscale text fontsize
     :param xticks_rotation: int. angle to rotate xticks
     :param y_gridlines: boolean. If False, gridlines on the y axis are removed.
     :return: matplotlib axes object
     '''
-
     plt.figure(figsize=figsize)
 
-    cluster_colors = get_colors_4_categorical_series(df[class_column], cmap=cmap, colors_list=colors_list)
+    class_column_orig = class_column
 
-    class_order = DataTools.get_ordered_unique_vals_from_list(list(df[class_column]))
-    ax = parallel_coordinates(df, class_column,
-                              colormap=categorCmapFromList([cluster_colors['mapper'][c] for c in class_order]),
+    if class_column is None:
+        class_column = 'fake_class_for_fig'
+        df = df.copy()
+        df[class_column] = 1
+
+    if categorical:
+        cluster_colors = get_colors_4_categorical_series(df[class_column], cmap=cmap, colors_list=colors_list)
+        class_order = DataTools.get_ordered_unique_vals_from_list(list(df[class_column]))
+        colormap = categorCmapFromList([cluster_colors['mapper'][c] for c in class_order])
+    else:
+        if colors_list is None:
+            colormap = cmap
+        else:
+            colormap = diverging_cmap_from_list(colors_list)
+
+    ax = parallel_coordinates(df, class_column=class_column,
+                              colormap=colormap,
                               alpha=line_alpha)
-    if class_column is not None:
-        plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
-                   frameon=legend_frameon, title=legend_title)
+    ax.tick_params(axis='both', which='major', labelsize=ticks_fontsize)
+
+    if class_column_orig is not None:
+        if categorical:
+            plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
+                       frameon=legend_frameon, title=legend_title, fontsize=legend_fontsize,
+                       title_fontsize=legend_title_fontsize)
+        else:
+            ax.legend().remove()
+            cb = plt.colorbar(plt.cm.ScalarMappable(norm=plt.Normalize(df[class_column].min(), df[class_column].max()),
+                                        cmap=colormap), ax=ax)
+            cb.set_label(label=legend_title, fontsize=legend_title_fontsize)
+            cb.ax.tick_params(labelsize=legend_fontsize)
+    else:
+        ax.legend().remove()
 
     if plot_markers:
-        cluster_color_list = cluster_colors['colorSeries']
+        if categorical:
+            cluster_color_list = cluster_colors['colorSeries']
 
-        for i, col in enumerate(DataTools.get_df_col_names_without_cols(df, class_column)):
-            plt.scatter([i]*len(df[col]), df[col], s=marker_size, linewidth=marker_linewidth,
-                        c=cluster_color_list, marker=marker_type, alpha=marker_alpha)
+            for i, col in enumerate(DataTools.get_df_col_names_without_cols(df, class_column)):
+                plt.scatter([i]*len(df[col]), df[col], s=marker_size, linewidth=marker_linewidth,
+                            c=cluster_color_list, marker=marker_type, alpha=marker_alpha)
 
     plt.xticks(rotation=xticks_rotation)
     plt.xlabel(x_title, fontdict={'size': axis_title_fontsize})
@@ -1844,6 +2056,8 @@ def parallele_coordinates_plot(df, class_column=None, cmap='Set1', colors_list=N
     plt.tight_layout()
     if y_gridlines is False:
         ax.grid(False)
+
+    ax.set_title(fig_title, fontsize=fig_title_fontsize)
 
     return ax
 

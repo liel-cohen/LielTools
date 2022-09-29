@@ -1202,3 +1202,11 @@ def binary_vectors_similarity(vec1, vec2):
     metrics['shared_f_vec2'] = a / (a+c)
 
     return metrics
+
+
+def calc_f1_score(recall, precision):
+    if precision + recall == 0:
+        f1 = 0
+    else:
+        f1 = 2 * (precision * recall) / (precision + recall)
+    return f1
