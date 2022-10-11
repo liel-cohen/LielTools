@@ -43,6 +43,7 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                  linewidth=0, stripplot_palette=None,
                  xy_title_fontsize=None,
                  boxplot_color=None,
+                 add_mean_text=False,
 
                  add_mean=False,
                  mean_marker='_', mean_color='red',
@@ -54,6 +55,10 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
 
                  color_indices=None, color_indices_color='red', color_indices_size=20,
                  color_indices_linewidth=0, color_indices_alpha=1, color_indices_marker='o',
+
+                 connect_pairs=None, pairs_dot_color='grey', pairs_dot_size=20,
+                 pairs_dot_linewidth=0, pairs_dot_alpha=0.3, pairs_dot_marker='o',
+                 pairs_line_color='grey', pairs_line_alpha=0.7, pairs_line_linewidth=1, pairs_linestyle='-',
 
                  hide_indices_in_stripplot=None,
                  horizontal=False,
@@ -98,13 +103,14 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
     @param boxplot_color: str. Color to be used for all the boxplot elements
                           (if you don't want to use boxplot_palette).
                           Will also be used for the stripplot if stripplot_palette, stripplot_color and palette are all None.
+    @param add_mean_text: boolean. Whether to add the mean value for each boxplot in its x label.
     @param add_mean: boolean. Whether to add a marker showing the mean value for each boxplot.
                      Currently works only if hue isn't used. Default False
     @param mean_marker: str. Marker symbol for the mean. Default '_'
     @param mean_color: str. Color for the mean. Default 'red'
-    @param mean_size:
-    @param mean_linewidth:
-    @param mean_alpha:
+    @param mean_size: mean marker size
+    @param mean_linewidth: mean marker line width
+    @param mean_alpha: mean marker alpha
     @param add_gmean: boolean. Whether to add a marker showing the geometric mean value for each boxplot.
                      Currently works only if hue isn't used. Default False
     @param gmean_marker: str. Marker symbol for the gmean. Default '_'
@@ -120,6 +126,9 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
     @param color_indices_linewidth: float. Marker linewidth for the color_indices. Default 0
     @param color_indices_alpha: float. Marker alpha for the color_indices. Default 1
     @param color_indices_marker: str. Marker symbol for the color_indices. Default 'o'
+    @param connect_pairs: list of pairs (tuples) of indices. If stripplot=True,
+                          will connect the stripplot markers of each pair with a line.
+                          currently only supported if Hue is None
     @param hide_indices_in_stripplot: list of indices (from the given data series).
                                       Specific indices that should not be plotted in the stripplot.
                                       Default None.
@@ -138,6 +147,7 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
     sns.set_context(font_scale=font_scale)
     sns.set_style(snsStyle)
 
+    # if needed, add color_indices to list of indices to hide in stripplot
     if color_indices is not None:
         if hide_indices_in_stripplot is None:
             hide_indices_in_stripplot = color_indices
@@ -146,6 +156,18 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                 if ind not in hide_indices_in_stripplot:
                     hide_indices_in_stripplot.append(ind)
 
+    # if needed, add connect_pairs to list of indices to hide in stripplot
+    if connect_pairs is not None and seriesHue is None:
+        indices_in_pairs = [item for pair in connect_pairs for item in pair] # flatten connect_pairs to ind list
+
+        if hide_indices_in_stripplot is None:
+            hide_indices_in_stripplot = indices_in_pairs
+        else:
+            for ind in indices_in_pairs:
+                if ind not in hide_indices_in_stripplot:
+                    hide_indices_in_stripplot.append(ind)
+
+    # stripplot coloring
     if stripplot:
         if stripplot_color is None and stripplot_palette is None:
             if palette is not None:
@@ -219,10 +241,18 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                            c=mean_color, marker=mean_marker, alpha=mean_alpha,
                            zorder=10)
 
+        if add_mean_text: # currently only work if Hue=None # TODO
+            xticklabels = []
+            for i, label in enumerate(order):
+                mean = data.loc[data[DataTools.get_col_name(seriesX)] == label,
+                                DataTools.get_col_name(seriesY)].mean()
+                xticklabels.append(f'{label}\n({mean:.3f})')
+            ax.set_xticklabels(xticklabels)
+
         if add_gmean: # currently only work if Hue=None # TODO
             for i, label in enumerate(order):
                 gmean = data.loc[data[DataTools.get_col_name(seriesX)] == label,
-                                DataTools.get_col_name(seriesY)].apply(stats.gmean)
+                                 DataTools.get_col_name(seriesY)].apply(stats.gmean)
 
                 ax.scatter(i, gmean, s=gmean_size, linewidth=gmean_linewidth,
                            c=gmean_color, marker=gmean_marker, alpha=gmean_alpha,
@@ -245,6 +275,35 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
 
                 if xticklabel_found is False:
                     raise Exception(f'Did not find an xticklabel_text that matches index {ind_to_color}! Please check why.')
+
+        ### Add lines between paired data points
+        if connect_pairs is not None and seriesHue is None: # currently only works if Hue=None # TODO
+            ind_pos = {}
+            for ind1, ind2 in connect_pairs:
+                # add marker for both data points
+                for ind_to_color in [ind1, ind2]:
+                    xticklabel_found = False
+                    for i, xticklabel in enumerate(ax.get_xticklabels()):
+                        xticklabel_text = xticklabel.get_text()
+
+                        if str(data.loc[ind_to_color, DataTools.get_col_name(seriesX)]) == xticklabel_text:
+                            xticklabel_found = True
+
+                            if ind_to_color not in ind_pos: # if ind appearred in another pair, a marker was already added for it, no need to re-add
+                                ind_pos[ind_to_color] = {'x': i+(2*jitter*(random.random()-0.5)),
+                                                          'y': data.loc[ind_to_color, DataTools.get_col_name(seriesY)]}
+                                ax.scatter(ind_pos[ind_to_color]['x'], ind_pos[ind_to_color]['y'],
+                                           s=pairs_dot_size, linewidth=pairs_dot_linewidth, c=pairs_dot_color,
+                                           marker=pairs_dot_marker, alpha=pairs_dot_alpha, zorder=10)
+
+                    if xticklabel_found is False:
+                        raise Exception(f'Did not find an xticklabel_text that matches index {ind_to_color}! Please check why.')
+
+                # add a line between the two markers
+                ax.plot([ind_pos[ind1]['x'], ind_pos[ind2]['x']],
+                        [ind_pos[ind1]['y'], ind_pos[ind2]['y']],
+                        color=pairs_line_color, linewidth=pairs_line_linewidth,
+                        linestyle=pairs_linestyle, alpha=pairs_line_alpha, zorder=10)
 
     ax.set_title(plotTitle, fontdict=fontTitle)
     for tick in ax.get_xticklabels():
@@ -580,6 +639,9 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
     else:
         col_colors = None
 
+    if norm is None:
+        norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=False)
+
     grid = sns.clustermap(numbersTable, cmap=cmap, norm=norm, figsize=figsize,
                           row_cluster=row_clustering, col_cluster=col_clustering,
                           cbar_kws={'label': cbar_title,
@@ -721,7 +783,9 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
                  title='', title_fontsize=13, ax=None,
                  font_scale=1, snsStyle='ticks', xRotation=0,
                  yRotation=90, square=False,
-                 xlabel='', ylabel='', colormap_label='',
+                 xlabel='', ylabel='',
+                 colormap_label='', colormap_label_fontsize=None,
+                 colormap_ticks_fontsize=None,
                  vmin=None, vmax=None, supress_ticks=True,
                  annotate_text=False, annotate_fontsize=8,
                  annotation_format=".2f",
@@ -750,7 +814,13 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     if not hide_colorbar:
-        ax.collections[0].colorbar.set_label(colormap_label)
+        if colormap_label_fontsize is not None:
+            ax.collections[0].colorbar.set_label(colormap_label, fontsize=colormap_label_fontsize)
+        else:
+            ax.collections[0].colorbar.set_label(colormap_label)
+
+        if colormap_ticks_fontsize is not None:
+            ax.collections[0].colorbar.ax.tick_params(axis='both',which='major',labelsize=colormap_ticks_fontsize)
 
     for tick in ax.get_xticklabels():
         tick.set_rotation(xRotation)
@@ -905,44 +975,59 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
                         dots_x_offset=0.002, order=None, x_rotation=0,
                         xy_title_fontsize=12, font_scale=1, violin_cut=2,
                         hide_indices_in_stripplot=None,
+
                         connect_pairs=None, pairs_dot_color='grey', pairs_dot_size=20,
                         pairs_dot_linewidth=0, pairs_dot_alpha=0.3, pairs_dot_marker='o',
-                        pairs_line_color='grey', pairs_line_alpha=0.7, pairs_line_linewidth=1, pairs_linestyle='-'
-                        ):
+                        pairs_line_color='grey', pairs_line_alpha=0.7, pairs_line_linewidth=1, pairs_linestyle='-',
+
+                        add_mean_text=False,
+
+                        add_mean=False,
+                        mean_marker='_', mean_color='red',
+                        mean_size=100, mean_linewidth=3, mean_alpha=1):
     """
     Plot a violin plot with a boxplot and stripplot on top.
 
-    :param df: pandas Dataframe from to plot data from
-    :param x: string. x variable - column name from df
-    :param y: string. y variable (numeric) - column name from df
-    :param cut_in_half: boolean. cut violin plot in half such that stripplot
+    @param df: pandas Dataframe from to plot data from
+    @param x: string. x variable - column name from df
+    @param y: string. y variable (numeric) - column name from df
+    @param cut_in_half: boolean. cut violin plot in half such that stripplot
                         dots will be visible
-    :param stripplot: boolean. add stripplot
-    :param figsize: tuple of 2 numbers, default (6, 5)
-    :param xtitle: x axis title. Default is None, then uses x column name
-    :param ytitle: y axis title. Default is None, then uses x column name
-    :param palette: violin plot color palette (name or dictionary with x
+    @param stripplot: boolean. add stripplot
+    @param figsize: tuple of 2 numbers, default (6, 5)
+    @param xtitle: x axis title. Default is None, then uses x column name
+    @param ytitle: y axis title. Default is None, then uses x column name
+    @param palette: violin plot color palette (name or dictionary with x
                     values as keys and colors as values)
-    :param jitter: stripplot jitter size
-    :param dot_size: stripplot dot size
-    :param dot_color: stripplot dot color
-    :param violin_alpha: violin alpha (transparency)
-    :param stripplot_alpha: stripplot dots alpha (transparency)
-    :param boxplot_width: width of boxplot
-    :param dots_x_offset: offset of stripplot dots from the center of violin
+    @param jitter: stripplot jitter size
+    @param dot_size: stripplot dot size
+    @param dot_color: stripplot dot color
+    @param violin_alpha: violin alpha (transparency)
+    @param stripplot_alpha: stripplot dots alpha (transparency)
+    @param boxplot_width: width of boxplot
+    @param dots_x_offset: offset of stripplot dots from the center of violin
                           plot (only when it's cut in half)
-    :param order: list. order of x values
-    :param x_rotation: x labels rotation
-    :param xy_title_fontsize: x and y axis titles fontsize (default is None,
+    @param order: list. order of x values
+    @param x_rotation: x labels rotation
+    @param xy_title_fontsize: x and y axis titles fontsize (default is None,
                               then uses seaborn automaticaly chosen size)
-    :param font_scale: seaborn fontscale
-    :param violin_cut: sns.violinplot parameter: Distance, in units of bandwidth size, to extend the
+    @param font_scale: seaborn fontscale
+    @param violin_cut: sns.violinplot parameter: Distance, in units of bandwidth size, to extend the
                                           density past the extreme datapoints.
                                           Set to 0 to limit the violin range within the range
                                           of the observed data
-    :param hide_indices_in_stripplot: list of df indices to exclude from stripplot
-    :param connect_pairs: list of pairs (tuples) of indices. If stripplot=True and cut_in_half=False,
+    @param hide_indices_in_stripplot: list of df indices to exclude from stripplot
+    @param connect_pairs: list of pairs (tuples) of indices. If stripplot=True and cut_in_half=False,
                           will connect the stripplot markers of each pair with a line.
+    @param add_mean_text: boolean. Whether to add the mean value for each boxplot in its x label.
+    @param add_mean: boolean. Whether to add a marker showing the mean value for each boxplot.
+                     Currently works only if hue isn't used. Default False
+    @param mean_marker: str. Marker symbol for the mean. Default '_'
+    @param mean_color: str. Color for the mean. Default 'red'
+    @param mean_size: mean marker size
+    @param mean_linewidth: mean marker line width
+    @param mean_alpha: mean marker alpha
+
     :return: axes object
     """
 
@@ -951,6 +1036,9 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
     sns.set_style('white')
 
     plt.figure(figsize=figsize)
+
+    if order is None:
+        order = list(df[x].unique())
 
     # violin
     ax = sns.violinplot(y=y, x=x, data=df,
@@ -1006,9 +1094,8 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
 
         ### Add lines between paired data points
         if connect_pairs is not None and cut_in_half is False:
+            ind_pos = {}
             for ind1, ind2 in connect_pairs:
-                pair_pos = {}
-
                 # add marker for both data points
                 for ind_to_color in [ind1, ind2]:
                     xticklabel_found = False
@@ -1017,18 +1104,19 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
 
                         if str(df.loc[ind_to_color, x]) == xticklabel_text:
                             xticklabel_found = True
-                            pair_pos[ind_to_color] = {'x': i+(jitter*(random.random()-0.5)),
-                                                      'y': df.loc[ind_to_color, y]}
-                            ax.scatter(pair_pos[ind_to_color]['x'], pair_pos[ind_to_color]['y'],
-                                       s=pairs_dot_size, linewidth=pairs_dot_linewidth, c=pairs_dot_color,
-                                       marker=pairs_dot_marker, alpha=pairs_dot_alpha, zorder=10)
+                            if ind_to_color not in ind_pos: # if ind appearred in another pair, a marker was already added for it, no need to re-add
+                                ind_pos[ind_to_color] = {'x': i+(jitter*(random.random()-0.5)),
+                                                         'y': df.loc[ind_to_color, y]}
+                                ax.scatter(ind_pos[ind_to_color]['x'], ind_pos[ind_to_color]['y'],
+                                           s=pairs_dot_size, linewidth=pairs_dot_linewidth, c=pairs_dot_color,
+                                           marker=pairs_dot_marker, alpha=pairs_dot_alpha, zorder=10)
 
                     if xticklabel_found is False:
                         raise Exception(f'Did not find an xticklabel_text that matches index {ind_to_color}! Please check why.')
 
                 # add a line between the two markers
-                ax.plot([pair_pos[ind1]['x'], pair_pos[ind2]['x']],
-                        [pair_pos[ind1]['y'], pair_pos[ind2]['y']],
+                ax.plot([ind_pos[ind1]['x'], ind_pos[ind2]['x']],
+                        [ind_pos[ind1]['y'], ind_pos[ind2]['y']],
                         color=pairs_line_color, linewidth=pairs_line_linewidth,
                         linestyle=pairs_linestyle, alpha=pairs_line_alpha, zorder=10)
 
@@ -1047,6 +1135,20 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
 
     ax.yaxis.label.set_size(fontsize=xy_title_fontsize)
     ax.xaxis.label.set_size(fontsize=xy_title_fontsize)
+
+    if add_mean: # currently only work if Hue=None # TODO
+        for i, label in enumerate(order):
+            mean = df.loc[df[x] == label, y].mean()
+            ax.scatter(i, mean, s=mean_size, linewidth=mean_linewidth,
+                       c=mean_color, marker=mean_marker, alpha=mean_alpha,
+                       zorder=10)
+
+    if add_mean_text: # currently only work if Hue=None # TODO
+        xticklabels = []
+        for i, label in enumerate(order):
+            mean = df.loc[df[x] == label, y].mean()
+            xticklabels.append(f'{label}\n({mean:.3f})')
+        ax.set_xticklabels(xticklabels)
 
     return ax
 

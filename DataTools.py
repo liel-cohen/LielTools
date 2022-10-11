@@ -658,3 +658,62 @@ def df_drop_duplicates(df, subset=None, keep='first'):
     rows_after = df_after.shape[0]
 
     return df_after, rows_before-rows_after
+
+def series_first_values_equal(series, start_from=1):
+    """
+    Gets a series, returns the number of adjacent items from its beginning (or from given position)
+    that are equal (minimum 1).
+    Examples:
+        In:  series_first_values_equal(pd.Series([1, 1, 1, 4, 33, 1, 100]))
+        Out: 3
+
+        In:  series_first_values_equal(pd.Series([1, 4, 33, 100]))
+        Out: 1
+
+        In: series_first_values_equal(pd.Series([1, 1, 1, 4, 33, 1, 100]), start_from=2)
+        Out: 2
+
+        In: series_first_values_equal(pd.Series([0, 1, 1, 1, 3, 33, 1, 100]), start_from=2)
+        Out: 3
+    :param series: a pd.Series with comparable items
+    :param start_from: starting position to check. Default 1 (first item)
+    :return: number of adjacent items from series beginning
+    """
+    num_values_equal = 0
+    first_value = series.iloc[start_from-1]
+    for i in range(start_from-1, len(series.index)):
+        if series.iloc[i] == first_value:
+            num_values_equal += 1
+        else:
+            break
+
+    return num_values_equal
+
+def list_first_values_equal(list1, start_from=1):
+    """
+    Gets a list, returns the number of adjacent items from its beginning (or from given position)
+    that are equal (minimum 1).
+    Examples:
+        In:  list_first_values_equal(pd.Series([1, 1, 1, 4, 33, 1, 100]))
+        Out: 3
+
+        In:  list_first_values_equal(pd.Series([1, 4, 33, 100]))
+        Out: 1
+
+        In: list_first_values_equal(pd.Series([1, 1, 1, 4, 33, 1, 100]), start_from=2)
+        Out: 2
+
+        In: list_first_values_equal(pd.Series([0, 1, 1, 1, 3, 33, 1, 100]), start_from=2)
+        Out: 3
+    :param list1: a list of comparable items
+    :param start_from: starting position to check. Default 1 (first item)
+    :return: number of adjacent items from list1 beginning
+    """
+    num_values_equal = 0
+    for i in range(start_from-1, len(list1)):
+        if list1[i] == list1[start_from-1]:
+            num_values_equal += 1
+        else:
+            break
+
+    return num_values_equal

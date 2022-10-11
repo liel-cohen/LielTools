@@ -1195,11 +1195,23 @@ def binary_vectors_similarity(vec1, vec2):
     metrics['b'] = b
     metrics['c'] = c
     metrics['d'] = d
-    metrics['jaccard'] = a / (a + b + c)
     metrics['hamming'] = b + c
     metrics['hamming_per'] = (b + c) / n
-    metrics['shared_f_vec1'] = a / (a+b)
-    metrics['shared_f_vec2'] = a / (a+c)
+
+    if a+b+c == 0:
+        metrics['jaccard'] = 0
+    else:
+        metrics['jaccard'] = a / (a + b + c)
+
+    if a+b == 0:
+        metrics['shared_f_vec1'] = 0
+    else:
+        metrics['shared_f_vec1'] = a / (a+b)
+
+    if a+c == 0:
+        metrics['shared_f_vec2'] = 0
+    else:
+        metrics['shared_f_vec2'] = a / (a+c)
 
     return metrics
 
