@@ -35,7 +35,7 @@ import scipy.stats as stats
 # former plotBoxplot
 def plot_boxplot(seriesX, seriesY, seriesHue=None,
                  stripplot=True, boxplot=True,
-                 ax=None, order=None, palette=None,
+                 ax=None, order=None, hue_order=None, palette=None,
                  figsize=(7, 6), showfliers=False, plotTitle='', xTitle='', yTitle='',
                  xRotation=45, titleFontSize=18, titleColor='maroon', legendTitle='',
                  font_scale=1, snsStyle='ticks', boxTransparency=0.6, jitter=0.15,
@@ -58,10 +58,13 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
 
                  connect_pairs=None, pairs_dot_color='grey', pairs_dot_size=20,
                  pairs_dot_linewidth=0, pairs_dot_alpha=0.3, pairs_dot_marker='o',
-                 pairs_line_color='grey', pairs_line_alpha=0.7, pairs_line_linewidth=1, pairs_linestyle='-',
+                 pairs_line_color='grey', pairs_line_alpha=0.7, pairs_line_linewidth=1,
+                 pairs_linestyle='-',
 
                  hide_indices_in_stripplot=None,
                  horizontal=False,
+
+                 add_lines_between_xvals=False,
 
                  saveFolder=None, save_path=None, dpi=300):
     """
@@ -79,6 +82,7 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
     @param ax: matplotlib axes object on which plot should be plotted.
                Default None (then a new object will be created).
     @param order: list of x axis (unique) values by the order they should be displayed (from left to right).
+    @param hue_order: list of hue values by the order they should be displayed (from left to right).
     @param palette: str. color palette to be used for the boxplot.
                     Will also be used for the stripplot if stripplot_palette and stripplot_color are None.
     @param figsize: tuple of 2 numbers representing the figure size to be plotted (width, height). Default (7, 6)
@@ -133,6 +137,8 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                                       Specific indices that should not be plotted in the stripplot.
                                       Default None.
     @param horizontal:
+    @param add_lines_between_xvals: boolean. If True, vertical lines will be added between x axis
+                        values. This can be useful when hue is used and figure is packed with boxes.
     @param saveFolder: str. folder in which to save the plot in jpg file.
                        File name will be automatically formatted using the names
                        of x, y and hue titles. Default None.
@@ -210,15 +216,17 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                         showfliers=showfliers,
                         hue=DataTools.get_col_name(seriesHue),
                         boxprops=dict(alpha=boxTransparency),
-                        palette=palette, order=order, color=boxplot_color)
+                        palette=palette, order=order, color=boxplot_color,
+                        hue_order=hue_order)
         if stripplot:
             sns.stripplot(data=stripplot_data, x=seriesX.name, y=seriesY.name,
                           hue=DataTools.get_col_name(seriesHue), ax=ax,
                           jitter=jitter, alpha=stripplot_alpha,
                           edgecolor='black', linewidth=linewidth,
                           size=stripplot_size, color=stripplot_color,
-                          palette=stripplot_palette, order=order, split=True)
-    else:                     # no hue
+                          palette=stripplot_palette, order=order,
+                          split=True, hue_order=hue_order)
+    else:
         if boxplot:
             sns.boxplot(data=data, x=DataTools.get_col_name(seriesX), ax=ax,
                         y=DataTools.get_col_name(seriesY), showfliers=showfliers,
@@ -344,6 +352,10 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
     xticksText = ax.get_xticklabels()
     xticksText = bin_text_to_yes_no(xticksText)
     ax.set_xticklabels(xticksText)
+
+    if add_lines_between_xvals:
+        for x in ax.get_xticks():
+            ax.axvline(x+.5, color='k')
 
     plt.tight_layout()
 
