@@ -1536,15 +1536,17 @@ def spaghetti_patients(patientDf, classColumn=None, figsize=(6, 8),
 def plot_scatter_hue(series_x, series_y, series_hue=None,
                      save_folder=None, save_full_path=None,
                      aspect_ratio=1.2, fig_height=5,
-                     show_reg_line=False, plot_title='',
+                     show_reg_line=False, show_ci=True,
+                     plot_title='',
                      x_title='', y_title='', x_rotation=45,
                      titleFontSize=18, title_color='maroon',
                      hue_legend_title='', xticks=None, font_scale=1,
                      sns_style="ticks", legend_frame=False,
                      hue_colorscale=False, hue_palette='Set2',
-                     marker_size=5,
+                     marker_size=5, marker_alpha=1,
                      marker_linewidth=0, marker_edgecolor='black',
-                     marker_alpha=1,
+                     regline_linewidth=2, regline_alpha=1,
+                     regline_color=None, regline_linestyle='-',
                      x_log_scale=False, y_log_scale=False,
                      ylim=None, xlim=None):
     sns.set(font_scale=font_scale)
@@ -1559,12 +1561,20 @@ def plot_scatter_hue(series_x, series_y, series_hue=None,
     if hue_legend_title== '' and series_hue is not None:
         hue_legend_title = DataTools.get_col_name(series_hue)
 
+    line_kws = {'linewidth': regline_linewidth,
+                'alpha': regline_alpha,
+                'linestyle': regline_linestyle}
+    if regline_color is not None:
+        line_kws['color']: regline_color
+
     if series_hue is not None: # hue exists
         fig11 = sns.lmplot(DataTools.get_col_name(series_x),
                            DataTools.get_col_name(series_y), data,
-                           hue=DataTools.get_col_name(series_hue), fit_reg=show_reg_line,
+                           hue=DataTools.get_col_name(series_hue),
+                           fit_reg=show_reg_line, ci=show_ci,
                            legend=False, aspect=aspect_ratio, height=fig_height,
                            palette=hue_palette,
+                           line_kws=line_kws,
                            scatter_kws={'linewidths': marker_linewidth,
                                         'edgecolor': marker_edgecolor,
                                         'alpha': marker_alpha,
@@ -1572,8 +1582,10 @@ def plot_scatter_hue(series_x, series_y, series_hue=None,
                            )
     else:                     # no hue
         fig11 = sns.lmplot(DataTools.get_col_name(series_x), DataTools.get_col_name(series_y),
-                           data, fit_reg=show_reg_line, legend=False,
+                           data, fit_reg=show_reg_line, ci=show_ci,
+                           legend=False,
                            aspect=aspect_ratio, height=fig_height,
+                           line_kws=line_kws,
                            scatter_kws={'linewidths': marker_linewidth,
                                         'edgecolor': marker_edgecolor,
                                         'alpha': marker_alpha})
@@ -1627,7 +1639,7 @@ def plot_scatter_hue(series_x, series_y, series_hue=None,
 # former plotScatter
 def plot_scatter(x_series, y_series,
                  ax=None, figsize=(6, 5),
-                 show_reg_line=True,
+                 show_reg_line=True, show_ci=True,
                  plt_corr_txt=True, plot_pearson=True, plot_spearman=True,
                  plot_title='', x_title='', y_title='',
                  font_scale=1, sns_style='ticks',
@@ -1640,7 +1652,9 @@ def plot_scatter(x_series, y_series,
                  correl_text_x_loc=0.2, correl_text_y_loc=0.96,
                  save_folder=None, save_full_path=None,
                  x_log_scale=False, y_log_scale=False,
-                 color_list=None):
+                 color_list=None,
+                 regline_linewidth=2, regline_alpha=1,
+                 regline_color=None, regline_linestyle='-'):
     """
 
     @param x_series: pd.Series. x values series.
@@ -1648,6 +1662,7 @@ def plot_scatter(x_series, y_series,
     @param ax: matplotlib axes object to plot over. Default None
     @param figsize: tuple (length 2) with numbers indicating figure size. Default (6, 5)
     @param show_reg_line: boolean. Whether to add a regression line. Default True
+    @param show_ci: boolean. Whether to show the confidence interval area of the regression line. Default True
     @param plt_corr_txt: boolean. Whether to add correlation text. Default True
     @param plot_pearson: boolean. Whether to add the Pearson correlation text. Default True
     @param plot_spearman: boolean. Whether to add the Pearson correlation text. Default True
@@ -1673,7 +1688,11 @@ def plot_scatter(x_series, y_series,
     @param save_folder: str. Folder to save the figure (file name determined automatically). Default None
     @param save_full_path: str. Full path to save the figure. Default None
     @param color_list: list of strings. A list with a color for each datapoint (by their order). Overrides markers_color
-    @return:
+    @param regline_linewidth: regression line linewidth
+    @param regline_alpha: regression line alpha
+    @param regline_color: regression line color
+    @param regline_linestyle: regression line linestyle
+    @return: fig11
     """
     sns.set(font_scale=font_scale)
     sns.set_style(sns_style)
@@ -1691,9 +1710,14 @@ def plot_scatter(x_series, y_series,
     fontTitle = {'size': title_font_size, 'color': title_color, 'weight': 'bold'}
     fig11 = sns.regplot(x=data[DataTools.get_col_name(x_series)],
                         y=data[DataTools.get_col_name(y_series)],
-                        ax=ax, fit_reg=show_reg_line, color=markers_color,
+                        ax=ax, fit_reg=show_reg_line, ci=show_ci,
+                        color=markers_color,
                         x_jitter=x_jitter, y_jitter=y_jitter,
-                        scatter_kws=scatter_kws)
+                        scatter_kws=scatter_kws,
+                        line_kws={'linewidth': regline_linewidth,
+                                  'alpha': regline_alpha,
+                                  'color': regline_color if regline_color is not None else markers_color,
+                                  'linestyle': regline_linestyle})
 
     if plt_corr_txt:
         add_correls_to_fig(fig11, data[DataTools.get_col_name(x_series)],
@@ -1735,6 +1759,7 @@ def plot_scatter(x_series, y_series,
     if save_full_path is not None:
         save_plt(save_path=save_full_path)
 
+    return fig11
 
 def plotScatterLine(seriesX, seriesY, ax=None, saveFolder=None,
                 saveFullPath=None, figsize=(6, 5),
