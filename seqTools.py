@@ -881,6 +881,22 @@ def all_available_kmers_dict(series, k):
 
     return kmer_dict
 
+def all_available_kmers_f_seq(seq, k):
+    """
+    Gets a string. Returns a dictionary with all kmers (motifs) contained in the string,
+    and the amount of appearances for each.
+    @param seq: string
+    @param k: int. the size of motifs to extract (kmers)
+    @return: dict
+
+    """
+    kmer_dict = {}
+    for start in range(len(seq) - k + 1):
+        kmer = seq[start:start+k]
+        kmer_dict[kmer] = kmer_dict.get(kmer, 0) + 1
+
+    return kmer_dict
+
 
 def get_kmers_counts_and_positions(series, k, indices=None,
                                    return_pd_objects=False):

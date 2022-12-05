@@ -1125,7 +1125,7 @@ def semipartial_corr(C): # Michael Pyrcz modified the function above by Fabian P
 def get_class_preds_sklearn_model(model, preds_proba, class_name, raise_exception=True):
     """
     Gets a sklearn model, a matrix of predicted probabilities (output from function model.predict_proba)
-    and the class identifier (string/int. according to the model y_train vector).
+    and the class name (string/int. One of the values in the model's y_train vector).
     Returns the vector of predictions for the specified class, from preds_proba matrix.
     If the class is not in the model classes list, will return none or raise an error.
     @param model: sklearn model object

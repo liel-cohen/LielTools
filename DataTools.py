@@ -520,16 +520,20 @@ def get_df_col_unique_vals_dict(db, col_names=None, print_cols=False):
 def get_col_index_by_name(df, name):
     return df.columns.get_loc(name)
 
-def print_df_col_value_counts(df, max_vals_print=60):
+def print_df_col_value_counts(df, columns=None, max_vals_print=60):
     '''
     Prints the value counts of each column in df.
     From each column, prints up to max_vals_print values
     (descending order by value prevalence)
     :param df: pandas dataframe
+    :param columns: list of column names in df to analyze. If None, analyzes all
     :param max_vals_print: int, maximun amount of values to print from each column
     :return: None
     '''
-    for col in df.columns:
+    if columns is None:
+        columns = df.columns
+
+    for col in columns:
         counts = df[col].value_counts()
 
         print('\n### -------- Column: {}         ({} values)\n'.format(col, len(counts)))
@@ -717,3 +721,8 @@ def list_first_values_equal(list1, start_from=1):
             break
 
     return num_values_equal
+
+
+def flatten_list_of_lists(list_of_lists):
+    # If data is large or deeply nested, there are more efficient solutions here: https://stackoverflow.com/questions/952914/how-do-i-make-a-flat-list-out-of-a-list-of-lists
+    return [item for lst in list_of_lists for item in lst]

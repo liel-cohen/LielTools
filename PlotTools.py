@@ -7,6 +7,7 @@ else:
     import DataTools
     import StatsTools
 
+import math
 import matplotlib.pyplot as plt
 import pandas as pd
 import matplotlib as mpl
@@ -15,6 +16,7 @@ import seaborn as sns
 from matplotlib.lines import Line2D
 import matplotlib.cm as cm
 import matplotlib.colors
+from matplotlib import lines
 import random
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colors import Normalize
@@ -28,6 +30,8 @@ from scipy.stats import spearmanr
 # from pandas.tools.plotting import parallel_coordinates
 from pandas.plotting import parallel_coordinates
 import scipy.stats as stats
+import matplotlib.colors as colors
+from matplotlib.patches import Rectangle
 
 #### ----------------------------------- Figure Drawing ------------------------------------- ###
 
@@ -249,14 +253,6 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                            c=mean_color, marker=mean_marker, alpha=mean_alpha,
                            zorder=10)
 
-        if add_mean_text: # currently only work if Hue=None # TODO
-            xticklabels = []
-            for i, label in enumerate(order):
-                mean = data.loc[data[DataTools.get_col_name(seriesX)] == label,
-                                DataTools.get_col_name(seriesY)].mean()
-                xticklabels.append(f'{label}\n({mean:.3f})')
-            ax.set_xticklabels(xticklabels)
-
         if add_gmean: # currently only work if Hue=None # TODO
             for i, label in enumerate(order):
                 gmean = data.loc[data[DataTools.get_col_name(seriesX)] == label,
@@ -299,7 +295,7 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
 
                             if ind_to_color not in ind_pos: # if ind appearred in another pair, a marker was already added for it, no need to re-add
                                 ind_pos[ind_to_color] = {'x': i+(2*jitter*(random.random()-0.5)),
-                                                          'y': data.loc[ind_to_color, DataTools.get_col_name(seriesY)]}
+                                                         'y': data.loc[ind_to_color, DataTools.get_col_name(seriesY)]}
                                 ax.scatter(ind_pos[ind_to_color]['x'], ind_pos[ind_to_color]['y'],
                                            s=pairs_dot_size, linewidth=pairs_dot_linewidth, c=pairs_dot_color,
                                            marker=pairs_dot_marker, alpha=pairs_dot_alpha, zorder=10)
@@ -356,6 +352,14 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
     if add_lines_between_xvals:
         for x in ax.get_xticks():
             ax.axvline(x+.5, color='k')
+
+    if add_mean_text: # currently only work if Hue=None # TODO
+        xticklabels = []
+        for i, label in enumerate(order):
+            mean = data.loc[data[DataTools.get_col_name(seriesX)] == label,
+                            DataTools.get_col_name(seriesY)].mean()
+            xticklabels.append(f'{label}\n({mean:.3f})')
+        ax.set_xticklabels(xticklabels)
 
     plt.tight_layout()
 
@@ -414,9 +418,9 @@ def plot_boxplot_df(df, stripplot=True, saveFolder=None, figsize=(7, 6),
             stripplot_df[hide_stripplot_mask] = np.nan
 
         sns.stripplot(data=stripplot_df, ax=ax, jitter=jitter, size=stripplot_marker_size,
-                        alpha=stripplot_transparency,
-                        edgecolor='black', linewidth=stripplot_linewidth,
-                        color=color_stripplot)
+                      alpha=stripplot_transparency,
+                      edgecolor='black', linewidth=stripplot_linewidth,
+                      color=color_stripplot)
 
     ax.set_title(plotTitle, fontdict=fontTitle)
     for tick in ax.get_xticklabels():
@@ -546,16 +550,16 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
     :param linewidths: heatmap grid width
     :param linecolor: heatmap grid color
 
-    :param row_color_vals: pd.Series of values by which to color the rows.
+    :param row_color_vals: pd.Series of numeric values by which to color the rows.
                            or, a list of pd.Series, each will create a different
                            color strip for coloring the rows. If given a list,
                            row_cmap, row_vmin, and row_vmax should also be lists!
+    :param row_color_labels: Series with categorical labels for rows.
     :param row_cmap: either a colormap name (string), or a list of colors,
                      for example from PlotTools.getColorsList(n)['colors']
-    :param row_vmin: row_color_vals - colorman vmin
-    :param row_vmax: row_color_vals - colorman vmax
+    :param row_vmin: row_color_vals - colormap vmin
+    :param row_vmax: row_color_vals - colormap vmax
 
-    :param row_color_labels: Series with (categorical) labels for rows.
     :param mask: which cells not to show (will show empty cell - not colored)
     :param annotate_text: boolean indicating whether to annotate text over the heatmap,
                           or matrix with the same dimensions as data to annotate over the heatmap.
@@ -606,7 +610,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
             row_colors_norm = matplotlib.colors.Normalize(vmin=row_vmin, vmax=row_vmax)
             row_colors = row_cmap(row_colors_norm(row_color_vals.values))
         else:  # row_cmap is a list of colors
-            row_cmap = categorCmapFromList(row_cmap)
+            row_cmap = diverging_cmap_from_list(row_cmap) # changed from categorCmapFromList
             row_colors = row_cmap(row_color_vals.values)
 
         return pd.Series(row_colors.tolist(), index=row_color_vals.index,
@@ -817,10 +821,10 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
         plt.figure(figsize=figsize, dpi=300)
 
     ax = sns.heatmap(numbersTable, cmap=cmap, vmin=vmin, vmax=vmax, ax=ax,
-                annot=annotate_text, annot_kws={"size": annotate_fontsize},
-                fmt=annotation_format, mask=mask, cbar=not hide_colorbar,
-                cbar_kws={"ticks": colorbar_ticks}, square=square,
-                linewidths=grid_linewidths, linecolor=grid_linecolor)
+                     annot=annotate_text, annot_kws={"size": annotate_fontsize},
+                     fmt=annotation_format, mask=mask, cbar=not hide_colorbar,
+                     cbar_kws={"ticks": colorbar_ticks}, square=square,
+                     linewidths=grid_linewidths, linecolor=grid_linecolor)
     ax.set_title(title, fontdict={'fontsize': title_fontsize,
                                   'fontweight': 'bold'})
     ax.set_xlabel(xlabel)
@@ -981,9 +985,10 @@ def plot_violinplot(series_x, series_y, series_hue=None,
 
 def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
                         figsize=(6,5), xtitle=None, ytitle=None,
-                        palette='Set1', jitter=0.05, dot_size=4,
-                        dot_color='grey', violin_alpha=0.8,
+                        palette='Set1', jitter=0.05, jitter_y=None,
+                        dot_size=4, dot_color='grey', violin_alpha=0.8,
                         stripplot_alpha=0.3, boxplot_width=0.3,
+                        box_lines_color='#404040', box_lines_width=2,
                         dots_x_offset=0.002, order=None, x_rotation=0,
                         xy_title_fontsize=12, font_scale=1, violin_cut=2,
                         hide_indices_in_stripplot=None,
@@ -992,7 +997,7 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
                         pairs_dot_linewidth=0, pairs_dot_alpha=0.3, pairs_dot_marker='o',
                         pairs_line_color='grey', pairs_line_alpha=0.7, pairs_line_linewidth=1, pairs_linestyle='-',
 
-                        add_mean_text=False,
+                        add_mean_text=False, mean_text_num_digits=2,
 
                         add_mean=False,
                         mean_marker='_', mean_color='red',
@@ -1011,12 +1016,16 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
     @param ytitle: y axis title. Default is None, then uses x column name
     @param palette: violin plot color palette (name or dictionary with x
                     values as keys and colors as values)
-    @param jitter: stripplot jitter size
+    @param jitter: stripplot jitter size for x values (categorical)
+    @param jitter_y: stripplot jitter size for y values. For example,
+                     might be helpful if y values are ints. Default None
     @param dot_size: stripplot dot size
     @param dot_color: stripplot dot color
     @param violin_alpha: violin alpha (transparency)
     @param stripplot_alpha: stripplot dots alpha (transparency)
     @param boxplot_width: width of boxplot
+    @param box_lines_color: color of the boxplot lines (box frame, whiskers etc.)
+    @param box_lines_width: linewidth of the boxplot lines (box frame, whiskers etc.)
     @param dots_x_offset: offset of stripplot dots from the center of violin
                           plot (only when it's cut in half)
     @param order: list. order of x values
@@ -1032,6 +1041,7 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
     @param connect_pairs: list of pairs (tuples) of indices. If stripplot=True and cut_in_half=False,
                           will connect the stripplot markers of each pair with a line.
     @param add_mean_text: boolean. Whether to add the mean value for each boxplot in its x label.
+    @param mean_text_num_digits: int. Number of digits after the dot for the mean in the x labels.
     @param add_mean: boolean. Whether to add a marker showing the mean value for each boxplot.
                      Currently works only if hue isn't used. Default False
     @param mean_marker: str. Marker symbol for the mean. Default '_'
@@ -1042,7 +1052,6 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
 
     :return: axes object
     """
-
     plt.close('all')
     sns.set(font_scale=font_scale)
     sns.set_style('white')
@@ -1073,12 +1082,20 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
 
     ### boxplot
     sns.boxplot(y=y, x=x, data=df, saturation=1, showfliers=False,
-                width=boxplot_width, boxprops={'zorder': 3, 'facecolor': 'none'},
-                ax=ax, order=order)
+                width=boxplot_width, ax=ax, order=order,
+                boxprops={'zorder': 3, 'fill': False, 'color': box_lines_color, 'linewidth': box_lines_width, 'alpha': 0.7},
+                capprops={'color': box_lines_color, 'linewidth': box_lines_width, 'alpha': 0.7},
+                whiskerprops={'color': box_lines_color, 'linewidth': box_lines_width, 'alpha': 0.7},
+                medianprops={'color': box_lines_color, 'linewidth': box_lines_width, 'alpha': 0.7},
+                )
     old_len_collections = len(ax.collections)
 
     ### stripplot
     if stripplot:
+
+        stripplot_data = df.copy()
+        if jitter_y is not None:
+            stripplot_data[y] = stripplot_data[y].apply(lambda x: x + (jitter_y*(random.random()-0.5)))
 
         # if going to use connect_pairs, must make sure that the pair indices are in hide_indices_in_stripplot
         if connect_pairs is not None and cut_in_half is False:
@@ -1087,12 +1104,13 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
             if hide_indices_in_stripplot is None:
                 hide_indices_in_stripplot = indices_in_pairs
             else:
-                for ind in indices_in_pairs:
+                for ind in set(indices_in_pairs):
                     if ind not in hide_indices_in_stripplot:
                         hide_indices_in_stripplot.append(ind)
+                    else:
+                        raise Exception(f'index {ind} appears in connect_pairs, but also in hide_indices_in_stripplot. Please decide if you want it presented or not and revise parameters.')
 
         # get data for stripplot
-        stripplot_data = df.copy()
         if hide_indices_in_stripplot is not None:
             stripplot_data = DataTools.get_df_without_indices(stripplot_data,
                                                               hide_indices_in_stripplot)
@@ -1159,7 +1177,7 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
         xticklabels = []
         for i, label in enumerate(order):
             mean = df.loc[df[x] == label, y].mean()
-            xticklabels.append(f'{label}\n({mean:.3f})')
+            xticklabels.append(f'{label}\n(' + format(mean, "." + str(mean_text_num_digits) + "f") + ')')
         ax.set_xticklabels(xticklabels)
 
     return ax
@@ -1219,137 +1237,18 @@ def plot_boxplot_hue_stats_text(df, x_col_name, y_col_name, hue_col_name,
     return ax
 
 
-''' gets counts data column/s and creates a bar plot '''
-def DFbarPlot_old(data, columns=None,
-              figsize=(6, 4),
-              plotTitle='',
-              plotOnaxes=None,
-              xTitle=None, yTitle=None,
-              ylim=None, xRotation=45,
-              width=0.8,
-              legendLabels=None,
-              legendTitle=None,
-              grid=False,
-              showLegend=True,
-              titleFontSize=22,
-              axesTitleFontSize=18, axesTicksFontSize=16,
-              legendFontSize=16, legendTitleFontSize=17,
-              stacked=False,
-              add_value_labels=False, float_num_digits=2,
-              value_labels_fontsize=12, value_labels_rotation=0,
-              savePath=None, color_list=None, value_labels_spacing=2
-              ):
-    if type(data) is pd.Series:
-        data = pd.DataFrame(data)
-    if columns is None:
-        columns = data.columns
-
-    figNew = plt.figure()
-    if plotOnaxes is not None: # if an axes was provided, use axes
-        data[columns].plot.bar(stacked=stacked, grid=grid,
-                               figsize=figsize, ax=plotOnaxes,
-                               width=width, color=color_list)
-        plotOnaxes.set_title(plotTitle, fontsize=titleFontSize)
-        for tick in plotOnaxes.get_xticklabels():
-            tick.set_rotation(xRotation)
-        if (xTitle is not None):
-            plotOnaxes.set_xlabel(xTitle)
-        if (yTitle is not None):
-            plotOnaxes.set_ylabel(yTitle)
-        if (ylim is not None):
-            plotOnaxes.set_ylim(ylim)
-        if (legendLabels is not None):
-            plotOnaxes.legend(legendLabels)
-        if (showLegend==False):
-            if plotOnaxes.get_legend() is not None:
-                plotOnaxes.get_legend().remove()
-        else:
-            plotOnaxes.legend_.remove()
-            plotOnaxes.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., frameon=False,
-                              fontsize=legendFontSize)
-
-            legText = plotOnaxes.get_legend().get_texts()
-            legText = bin_text_to_yes_no(legText)
-            if (legendTitle is not None):
-                plotOnaxes.get_legend().set_title(legendTitle)
-                plt.setp(plotOnaxes.get_legend().get_title(),
-                         fontsize=legendTitleFontSize)
-
-        xticksText = plotOnaxes.get_xticklabels()
-        xticksText = bin_text_to_yes_no(xticksText)
-        plotOnaxes.set_xticklabels(xticksText)
-
-        plotOnaxes.tick_params(axis='both', which='major', labelsize=axesTicksFontSize)
-        plotOnaxes.xaxis.label.set_size(axesTitleFontSize)
-        plotOnaxes.yaxis.label.set_size(axesTitleFontSize)
-
-        if add_value_labels:
-            bar_plot_add_value_labels(plotOnaxes,
-                                      float_num_digits=float_num_digits,
-                                      fontsize=value_labels_fontsize,
-                                      value_labels_rotation=value_labels_rotation,
-                                      spacing=value_labels_spacing)
-
-    else:                       # if not, use plt
-        data[columns].plot.bar(stacked=stacked, grid=grid,
-                               figsize=figsize, legend=None,
-                               width=width,
-                               color=color_list)
-        plt.title(plotTitle, fontsize=titleFontSize)
-        plt.xticks(rotation=xRotation)
-        if (xTitle is not None):
-            plt.xlabel(xTitle)
-        if (yTitle is not None):
-            plt.ylabel(yTitle)
-        if (ylim is not None):
-            plt.ylim(ylim)
-        if (showLegend & (legendLabels is not None)):
-            plt.legend(legendLabels)
-        if (showLegend & (legendLabels is None)):
-            plt.legend()
-        if (showLegend):
-            plt.axes().legend_.remove()
-            plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., frameon=False)
-
-            legText = plt.axes().get_legend().get_texts()
-            legText = bin_text_to_yes_no(legText)
-            if (legendTitle is not None):
-                plt.axes().get_legend().set_title(legendTitle)
-                plt.setp(plt.axes().get_legend().get_title(),
-                         fontsize=legendTitleFontSize)
-
-        xticksText = plt.axes().get_xticklabels()
-        xticksText = bin_text_to_yes_no(xticksText)
-        plt.axes().set_xticklabels(xticksText)
-
-        plt.rc('xtick', labelsize=axesTicksFontSize)  # fontsize of the tick labels
-        plt.rc('ytick', labelsize=axesTicksFontSize)  # fontsize of the tick labels
-        plt.rc('legend', fontsize=legendFontSize)  # legend fontsize
-        # plt.rc('figure', titlesize=titleFontSize)  # fontsize of the figure title
-        plt.axes().xaxis.label.set_size(axesTitleFontSize)
-        plt.axes().yaxis.label.set_size(axesTitleFontSize)
-        if add_value_labels:
-            bar_plot_add_value_labels(plt.axes(),
-                             float_num_digits=float_num_digits,
-                             fontsize=value_labels_fontsize,
-                             value_labels_rotation=value_labels_rotation,
-                             spacing=value_labels_spacing)
-        plt.tight_layout()
-        save_plt(save_path=savePath)
-
-    return(figNew)
-
 def DFbarPlot(data, columns=None, figsize=(6, 4), plotTitle='',
               ax=None, xTitle=None, yTitle=None, ylim=None, xRotation=45, width=0.8,
               showLegend=True, legendLabels=None, legendTitle=None,
               grid=False, titleFontSize=22,
               axesTitleFontSize=18, axesTicksFontSize=16,
               legendFontSize=16, legendTitleFontSize=17,
+              legend_bbox_to_anchor=(1.05, 1), legend_frameon=False,
               stacked=False,
               add_value_labels=False, float_num_digits=2,
               value_labels_fontsize=12, value_labels_rotation=0,
               savePath=None, color_list=None, value_labels_spacing=2,
-              plotOnaxes=None):
+              plotOnaxes=None, legend_order=None):
     if ax is None and plotOnaxes is not None: # retain backwards compatability for plotOnaxes (renamed to ax)
         ax = plotOnaxes
 
@@ -1387,11 +1286,11 @@ def DFbarPlot(data, columns=None, figsize=(6, 4), plotTitle='',
         ax.legend_.remove()
         if legendLabels is not None:
             ax.legend(legendLabels,
-                      bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
-                      frameon=False, fontsize=legendFontSize)
+                      bbox_to_anchor=legend_bbox_to_anchor, loc=2, borderaxespad=0.,
+                      frameon=legend_frameon, fontsize=legendFontSize)
         else:
-            ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
-                      frameon=False, fontsize=legendFontSize)
+            ax.legend(bbox_to_anchor=legend_bbox_to_anchor, loc=2, borderaxespad=0.,
+                      frameon=legend_frameon, fontsize=legendFontSize)
 
         legText = ax.get_legend().get_texts()
         legText = bin_text_to_yes_no(legText)
@@ -1409,12 +1308,27 @@ def DFbarPlot(data, columns=None, figsize=(6, 4), plotTitle='',
     ax.yaxis.label.set_size(axesTitleFontSize)
 
     if add_value_labels:
-        bar_plot_add_value_labels(ax, float_num_digits=float_num_digits,
-                                  fontsize=value_labels_fontsize,
-                                  value_labels_rotation=value_labels_rotation,
-                                  spacing=value_labels_spacing)
+        if not stacked:
+            bar_plot_add_value_labels(ax, float_num_digits=float_num_digits,
+                                      fontsize=value_labels_fontsize,
+                                      value_labels_rotation=value_labels_rotation,
+                                      spacing=value_labels_spacing)
+        else:
+            x_vals = list(data[columns].index)
+            y_vals = list(data[columns].sum(axis=1).values)
 
-    plt.tight_layout()
+            for i in range(len(y_vals)):
+                annot_text = format(y_vals[i], "." + str(float_num_digits) + "f")
+                text = ax.annotate(annot_text, xy=(i, y_vals[i]),
+                                   ha='center', va='bottom', fontsize=value_labels_fontsize)
+                text.set_rotation(value_labels_rotation)
+
+    if legend_order is not None:
+        reorder_legend(order=legend_order, legend_title=legendTitle, bbox_to_anchor=legend_bbox_to_anchor,
+                       legend_fontsize=legendFontSize, legend_title_fontsize=legendTitleFontSize,
+                       frameon=legend_frameon)
+
+    # plt.tight_layout()
     save_plt(save_path=savePath)
 
     return ax
@@ -1431,8 +1345,9 @@ def plotSeriesHistogram(numericSeries, useAxes=None, color='green', grid=False):
 
 
 def plot_barplot_from_series(counts, figsize=(18, 8), title='', ylabel='', xlabel='',
-                             xrotation=90, yrotation=90, annot=True, annot_format="{:.1f}",
-                             annot_fontsize=8, axes_titles_fontsize=8, axes_ticklabels_fontsize=8, title_fontsize=12):
+                             xrotation=0, yrotation=0, annot=True, annot_format="{:.1f}",
+                             annot_fontsize=8, axes_titles_fontsize=8, axes_ticklabels_fontsize=8,
+                             title_fontsize=12, color='teal', ax=None, annot_add_percent=False):
     """
     Gets a series, plots the values as bars with value annotation.
 
@@ -1441,28 +1356,39 @@ def plot_barplot_from_series(counts, figsize=(18, 8), title='', ylabel='', xlabe
     :param title: plot title
     :param ylabel: ylabel text
     :param xrotation: x tick text rotation
+    :param annot_format: for showing 0-1 floats as percentages use: {:.0%}
+    :param ax: axes object to plot over.
     :return:
     """
 
-    plt.figure(figsize=figsize)
-    plt.bar(counts.index, counts)
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    ax.bar(counts.index, counts, color=color)
 
     if annot:
         x_vals = list(counts.index)
         y_vals = list(counts.values)
 
         for i in range(len(y_vals)):
-            plt.annotate(annot_format.format(y_vals[i]), xy=(x_vals[i], y_vals[i]),
-                         ha='center', va='bottom', fontsize=annot_fontsize)
+            annot_text = annot_format.format(y_vals[i])
+            if annot_add_percent:
+                percent = y_vals[i]/counts.sum()
+                annot_text = annot_text + f' ({percent:.0%})'
+            ax.annotate(annot_text, xy=(x_vals[i], y_vals[i]),
+                        ha='center', va='bottom', fontsize=annot_fontsize)
 
-    plt.ylabel(ylabel, size=axes_titles_fontsize)
-    plt.xlabel(xlabel, size=axes_titles_fontsize)
-    plt.yticks(rotation=yrotation)
-    plt.xticks(rotation=xrotation)
-    plt.title(title, size=title_fontsize)
+    ax.set_ylabel(ylabel, size=axes_titles_fontsize)
+    ax.set_xlabel(xlabel, size=axes_titles_fontsize)
+    for tick in ax.get_yticklabels():
+        tick.set_rotation(yrotation)
+    for tick in ax.get_xticklabels():
+        tick.set_rotation(xrotation)
+    ax.set_title(title, fontsize=title_fontsize)
 
-    for label in (plt.gca().get_xticklabels() + plt.gca().get_yticklabels()):
+    for label in (ax.get_xticklabels() + ax.get_yticklabels()):
         label.set_fontsize(axes_ticklabels_fontsize)
+
+    return ax
 
 
 def spaghetti_patients(patientDf, classColumn=None, figsize=(6, 8),
@@ -1568,8 +1494,8 @@ def plot_scatter_hue(series_x, series_y, series_hue=None,
         line_kws['color']: regline_color
 
     if series_hue is not None: # hue exists
-        fig11 = sns.lmplot(DataTools.get_col_name(series_x),
-                           DataTools.get_col_name(series_y), data,
+        fig11 = sns.lmplot(x=DataTools.get_col_name(series_x),
+                           y=DataTools.get_col_name(series_y), data=data,
                            hue=DataTools.get_col_name(series_hue),
                            fit_reg=show_reg_line, ci=show_ci,
                            legend=False, aspect=aspect_ratio, height=fig_height,
@@ -1581,8 +1507,8 @@ def plot_scatter_hue(series_x, series_y, series_hue=None,
                                         's': marker_size},
                            )
     else:                     # no hue
-        fig11 = sns.lmplot(DataTools.get_col_name(series_x), DataTools.get_col_name(series_y),
-                           data, fit_reg=show_reg_line, ci=show_ci,
+        fig11 = sns.lmplot(x=DataTools.get_col_name(series_x), y=DataTools.get_col_name(series_y),
+                           data=data, fit_reg=show_reg_line, ci=show_ci,
                            legend=False,
                            aspect=aspect_ratio, height=fig_height,
                            line_kws=line_kws,
@@ -1648,11 +1574,11 @@ def plot_scatter(x_series, y_series,
                  title_color='maroon', xticks=None,
                  axes_title_font_size=14,
                  x_jitter=None, y_jitter=None,
-                 ylim=None, xlim=None,
+                 ylim=None, xlim=None, compact_text=False,
                  correl_text_x_loc=0.2, correl_text_y_loc=0.96,
                  save_folder=None, save_full_path=None,
                  x_log_scale=False, y_log_scale=False,
-                 color_list=None,
+                 color_list=None, supress_ticks=False,
                  regline_linewidth=2, regline_alpha=1,
                  regline_color=None, regline_linestyle='-'):
     """
@@ -1683,11 +1609,13 @@ def plot_scatter(x_series, y_series,
     @param y_jitter: boolean. Whether to add jitter to y values (relevant if they are integers). Default False
     @param ylim: tuple (length 2) with numbers indicating y axis limits, instead of the automatically set ones. Default None
     @param xlim: tuple (length 2) with numbers indicating x axis limits, instead of the automatically set ones. Default None
+    @param compact_text: boolean. Whether the corr text should be in a more compact format or not.
     @param correl_text_x_loc: Float. Starting position of the correlation text in the x axis. Default 0.2
     @param correl_text_y_loc: Float. Starting position of the correlation text in the y axis. Default 0.96
     @param save_folder: str. Folder to save the figure (file name determined automatically). Default None
     @param save_full_path: str. Full path to save the figure. Default None
     @param color_list: list of strings. A list with a color for each datapoint (by their order). Overrides markers_color
+    @param supress_ticks: boolean. If True, supress the small tick marks on both axis.
     @param regline_linewidth: regression line linewidth
     @param regline_alpha: regression line alpha
     @param regline_color: regression line color
@@ -1723,10 +1651,11 @@ def plot_scatter(x_series, y_series,
         add_correls_to_fig(fig11, data[DataTools.get_col_name(x_series)],
                            data[DataTools.get_col_name(y_series)],
                            font_size=corr_font_size, plotPearson=plot_pearson,
-                           plotSpearman=plot_spearman,
-                           text_x_loc=correl_text_x_loc,
-                           text_y_loc=correl_text_y_loc)
-    fig11.figure.set_size_inches(figsize)
+                           plotSpearman=plot_spearman, compact_text=compact_text,
+                           text_x_loc=correl_text_x_loc, text_y_loc=correl_text_y_loc)
+    if ax is None:
+        fig11.figure.set_size_inches(figsize)
+
     if xticks is not None: fig11.set(xticks=xticks)
 
     if x_log_scale:
@@ -1749,6 +1678,8 @@ def plot_scatter(x_series, y_series,
     # plt.rc('figure', titlesize=titleFontSize)  # fontsize of the figure title
     # plt.axes().xaxis.label.set_size(axesTitleFontSize)
     # plt.axes().yaxis.label.set_size(axesTitleFontSize)
+    if supress_ticks:
+        ax.tick_params(axis=u'both', which=u'both', length=0)
 
     plt.tight_layout()
 
@@ -1762,12 +1693,12 @@ def plot_scatter(x_series, y_series,
     return fig11
 
 def plotScatterLine(seriesX, seriesY, ax=None, saveFolder=None,
-                saveFullPath=None, figsize=(6, 5),
-                plotTitle='',xTitle='', yTitle='',
-                dotsColor='teal', ylim=None, xlim=None,
-                xRotation=45, titleFontSize=18,
-                titleColor='maroon', xticks=None, font_scale=1,
-                snsStyle='ticks', grid=False):
+                    saveFullPath=None, figsize=(6, 5),
+                    plotTitle='',xTitle='', yTitle='',
+                    dotsColor='teal', ylim=None, xlim=None,
+                    xRotation=45, titleFontSize=18,
+                    titleColor='maroon', xticks=None, font_scale=1,
+                    snsStyle='ticks', grid=False):
     sns.set(font_scale=font_scale)
     sns.set_style(snsStyle)
 
@@ -1855,10 +1786,10 @@ def plotLinePlot(data=None, seriesX=None, seriesY=None, ax=None,
 
 
 def catergorical_y_with_error(y_categories_series, x_nums_series, x_error_series=None, figsize=(8, 5),
-                          shape_size=650, shape_color='#99bbff', shape_marker='h',
-                          spines_alpha=0.2, x_title='', x_title_text_size=17, xlim=None,
-                          plot_values_text=True, plot_grid=True,
-                          xtick_fontsize=15, ytick_fontsize=15):
+                              shape_size=650, shape_color='#99bbff', shape_marker='h',
+                              spines_alpha=0.2, x_title='', x_title_text_size=17, xlim=None,
+                              plot_values_text=True, plot_grid=True,
+                              xtick_fontsize=15, ytick_fontsize=15):
     # shape marker options: https://matplotlib.org/3.1.1/api/markers_api.html#module-matplotlib.markers
 
     # Draw plot
@@ -1901,11 +1832,11 @@ def catergorical_y_with_error(y_categories_series, x_nums_series, x_error_series
     plt.tight_layout()
 
 
-def plot_distplot(vals, ax=None, bins=30, figsize=(30, 20),
-                  kde_color='black', hist_color='g', hist_alpha=0.3,
-                  rug=False, rug_color='black', rug_alpha=0.3,
-                  rug_linewidth=1, rug_height=0.03, font_scale=1,
-                  sns_style='ticks', x_rotation=0):
+def plot_distplot_old(vals, ax=None, bins=30, figsize=(30, 20),
+                      kde_color='black', hist_color='g', hist_alpha=0.3,
+                      rug=False, rug_color='black', rug_alpha=0.3,
+                      rug_linewidth=1, rug_height=0.03, font_scale=1,
+                      sns_style='ticks', x_rotation=0):
     sns.set(font_scale=font_scale)
     sns.set_style(sns_style)
 
@@ -1913,13 +1844,162 @@ def plot_distplot(vals, ax=None, bins=30, figsize=(30, 20),
         fig, ax = plt.subplots(figsize=figsize)
 
     ax = sns.distplot(vals, ax=ax, rug=rug, bins=bins,
-                 kde_kws={"color": kde_color},
-                 rug_kws={"color": rug_color, "alpha": rug_alpha,
-                          "linewidth": rug_linewidth, "height": rug_height},
-                 hist_kws={"color": hist_color, "alpha": hist_alpha},
-                 )
+                      kde_kws={"color": kde_color},
+                      rug_kws={"color": rug_color, "alpha": rug_alpha,
+                               "linewidth": rug_linewidth, "height": rug_height},
+                      hist_kws={"color": hist_color, "alpha": hist_alpha},
+                      )
     for tick in ax.get_xticklabels():
         tick.set_rotation(x_rotation)
+
+    return ax
+
+def plot_displot(series, hue_series=None, multiple='layer', palette='Set1',
+                 font_scale=1, sns_style='ticks',
+                 height=5, aspect=1.2, bins=30, color='teal',
+                 x_title=None, y_title='Frequency',
+                 plot_kde=True, plot_rug=True,
+                 kde_adjust=1.2, kde_method='scott', hist_alpha=0.4,
+                 rug_color='grey', rug_alpha=0.3, rug_linewidth=1, rug_height=0.03,
+                 xlim=None, ylim=None, x_rotation=0, cut=2):
+    """
+
+    @param series: numeric pd.Series to plot the distribution of
+    @param hue_series: categorical pd.Series. Distribution will be separated by it. Default None
+    @param multiple: method for dividing to categories, only if hue_series is given. “layer”, “dodge”, “stack” or “fill”
+    @param palette: pallete for the different categories, only if hue_series is given.
+    @param font_scale: seaborn font_scale
+    @param sns_style: seaborn sns_style
+    @param height: figure height
+    @param aspect: figure ratio between height and width
+    @param bins: number of bins for histogram
+    @param color: color, if hue_series is None
+    @param x_title: str. x axis title
+    @param y_title: str. y axis title
+    @param plot_kde: boolean. Whether to plot a kde curve over the histogram
+    @param plot_rug: boolean. Whether to plot a rug over the histogram
+    @param kde_adjust: factor that helps determine the amount of kde smoothing
+    @param kde_method: Method for determining the smoothing bandwidth to use: ‘scott’ / ‘silverman’
+    @param hist_alpha: histogram alpha (opacity)
+    @param rug_color: color of the rug lines
+    @param rug_alpha: alpha (opacity) of the rug lines
+    @param rug_linewidth: linewidth of the rug lines
+    @param rug_height: height of the rug lines
+    @param xlim: tuple with 2 numbers. figure x axis limits
+    @param ylim: tuple with 2 numbers. figure y axis limits
+    @param x_rotation: rotation angle of x tick labels
+    @param cut: multiplied by the smoothing bandwidth, that determines how far the evaluation grid extends
+                past the extreme datapoints. When set to 0, truncate the curve at the data limits.
+    @return: grid
+    """
+    sns.set(font_scale=font_scale)
+    sns.set_style(sns_style)
+
+    data = DataTools.join_non_empty_series_f_list([series, hue_series])
+
+    grid = sns.displot(data, x=DataTools.get_col_name(series),
+                       hue=DataTools.get_col_name(hue_series),
+                       height=height, aspect=aspect, fill=fill,
+                       multiple=multiple, bins=bins, color=color, palette=palette,
+                       rug=plot_rug, kde=plot_kde,
+                       kde_kws={'bw_adjust': kde_adjust, 'bw_method': kde_method, 'cut': cut},
+                       alpha=hist_alpha,
+                       rug_kws={"color": rug_color, "alpha": rug_alpha,
+                                "linewidth": rug_linewidth, "height": rug_height})
+    plt.xlabel(x_title)
+    plt.ylabel(y_title)
+    plt.xlim(xlim)
+    plt.ylim(ylim)
+    for tick in plt.gca().get_xticklabels():
+        tick.set_rotation(x_rotation)
+    return grid
+
+def plot_kdeplot(series, hue_series=None, ax=None, multiple='layer', palette='Set1',
+                 font_scale=1, sns_style='ticks', figsize=(7, 5), color='teal',
+                 x_title=None, y_title='Frequency',
+                 kde_adjust=1.2, kde_method='scott', fill=True, cut=2, alpha=0.4,
+                 xlim=None, ylim=None, x_rotation=0, linewidth=1,
+                 plot_legend=False, legend_outside_plot=True,
+                 add_median=False, median_ymin_factor=0.3, median_color=None,
+                 median_marker='D', median_marker_size=70,
+                 add_percentiles=False, perc_color=None, perc_linewidth=None,
+                 perc_ymin_factor=0.15, perc_width_factor=0.3,
+                 ):
+    """
+    @param series: numeric pd.Series to plot the distribution of
+    @param hue_series: categorical pd.Series. Distribution will be separated by it. Default None
+    @param ax: matplotlib axes object to plot on. If None, an axes object will be created. Default None
+    @param multiple: method for dividing to categories, only if hue_series is given. “layer”, “dodge”, “stack” or “fill”
+    @param palette: pallete for the different categories, only if hue_series is given.
+    @param font_scale: seaborn font_scale
+    @param sns_style: seaborn sns_style
+    @param figsize: tuple determining the figure size (width, height)
+    @param color: color, if hue_series is None
+    @param x_title: str. x axis title
+    @param y_title: str. y axis title
+    @param kde_adjust: factor that helps determine the amount of kde smoothing
+    @param kde_method: Method for determining the smoothing bandwidth to use: ‘scott’ / ‘silverman’
+    @param fill: If True, fill in the area under univariate density curves or between bivariate contours.
+                 If None, the default depends on multiple
+    @param alpha: kde alpha (opacity)
+    @param cut: multiplied by the smoothing bandwidth, that determines how far the evaluation grid extends
+                past the extreme datapoints. When set to 0, truncate the curve at the data limits.
+    @param xlim: tuple with 2 numbers. figure x axis limits
+    @param ylim: tuple with 2 numbers. figure y axis limits
+    @param x_rotation: rotation angle of x tick labels
+    @param plot_legend: boolean. Whether to plot legend or not.
+    @param legend_outside_plot: boolean. Whether to plot the legend outside the figure area or not.
+    @param linewidth: float. The width of the kde line.
+    @param add_median: boolean. Whether to add a marker in the position of the distribution median. *Not supported when hue_series is used.
+    @param median_ymin_factor: float. A factor determining the height of the median marker (proportion of the y range from the lower y limit)
+    @param median_color: string. color of the median marker. If None, the kde 'color' parameter is used.
+    @param median_marker: string. The median marker shape. Default 'D'
+    @param median_marker_size: int. The median marker side. Default 70
+    @param add_percentiles: boolean. Whether to add a box with positions of the distribution's 25th (left) and
+                            75th (right) percentiles (similar to boxplot). *Not supported when hue_series is used.
+    @param perc_color: string. color of the percentiles' box. If None, the kde 'color' parameter is used.
+    @param perc_linewidth: float. linewidth of the percentiles' box. If None, the kde 'linewidth' parameter is used.
+    @param perc_ymin_factor: float. A factor determining the lower position of the percentiles' box in the y axes (proportion of the y range from the lower y limit)
+    @param perc_width_factor: float. A factor determining the height of the percentiles' box (proportion of the y range from the lower y limit)
+    @return: ax
+    """
+
+    sns.set(font_scale=font_scale)
+    sns.set_style(sns_style)
+
+    data = DataTools.join_non_empty_series_f_list([series, hue_series])
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    ax = sns.kdeplot(x=data[DataTools.get_col_name(series)],
+                     hue=data[DataTools.get_col_name(hue_series)] if hue_series is not None else None,
+                     ax=ax, fill=fill, multiple=multiple, color=color, palette=palette,
+                     bw_adjust=kde_adjust, bw_method=kde_method, cut=cut,
+                     alpha=alpha, legend=plot_legend, linewidth=linewidth)
+
+    if plot_legend and legend_outside_plot:
+        sns.move_legend(ax, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., frameon=False)
+
+    ax.set_xlabel(x_title)
+    ax.set_ylabel(y_title)
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    for tick in ax.get_xticklabels():
+        tick.set_rotation(x_rotation)
+
+    ymin, ymax = ax.get_ylim()
+    if add_median:
+        ax.scatter(x=np.median(data[DataTools.get_col_name(series)]), y=ymin + ((ymax-ymin)*median_ymin_factor),
+                   c=[color if median_color is None else median_color], marker=median_marker, s=median_marker_size)
+
+    if add_percentiles:
+        per25 = np.percentile(data[DataTools.get_col_name(series)], 25)
+        per75 = np.percentile(data[DataTools.get_col_name(series)], 75)
+        ax.add_patch(Rectangle((per25, ymin + ((ymax-ymin)*perc_ymin_factor)),
+                               per75-per25, (ymax-ymin)*perc_width_factor, fill=None, alpha=1,
+                               color=color if perc_color is None else perc_color,
+                               linewidth=linewidth if perc_linewidth is None else perc_linewidth))
 
     return ax
 
@@ -2099,7 +2179,7 @@ def pairplot_with_spearman(df, font_scale=1, spearman_fontsize=10):
     g = sns.pairplot(df)
     g.map(corrfunc)
 
-def parallele_coordinates_plot(df, class_column=None, categorical=True,
+def parallele_coordinates_plot(df, class_column=None, categorical=True, ax=None,
                                cmap='Set1', colors_list=None, figsize=(8, 5),
                                fig_title='', fig_title_fontsize=13,
                                x_title='', y_title='', axis_title_fontsize=13,
@@ -2119,6 +2199,7 @@ def parallele_coordinates_plot(df, class_column=None, categorical=True,
                          If given, will be used to color the lines according to the class.
     :param categorical: bool. Whether the class_column is categorical (True - will add a color legend)
                               or numeric (False - will add a colorbar)
+    :param ax: matplotlib axes object to plot on. If None, one will be created.
     :param cmap: string. matplotlib cmap name. Will be used for the class column coloring
     :param colors_list: list of colors (length of the number of categories).
                         If cmap is None, these colors will be used.
@@ -2143,8 +2224,6 @@ def parallele_coordinates_plot(df, class_column=None, categorical=True,
     :param y_gridlines: boolean. If False, gridlines on the y axis are removed.
     :return: matplotlib axes object
     '''
-    plt.figure(figsize=figsize)
-
     class_column_orig = class_column
 
     if class_column is None:
@@ -2162,20 +2241,23 @@ def parallele_coordinates_plot(df, class_column=None, categorical=True,
         else:
             colormap = diverging_cmap_from_list(colors_list)
 
-    ax = parallel_coordinates(df, class_column=class_column,
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    ax = parallel_coordinates(df, class_column=class_column, ax=ax,
                               colormap=colormap,
                               alpha=line_alpha)
     ax.tick_params(axis='both', which='major', labelsize=ticks_fontsize)
 
     if class_column_orig is not None:
         if categorical:
-            plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
-                       frameon=legend_frameon, title=legend_title, fontsize=legend_fontsize,
-                       title_fontsize=legend_title_fontsize)
+            ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
+                      frameon=legend_frameon, title=legend_title, fontsize=legend_fontsize,
+                      title_fontsize=legend_title_fontsize)
         else:
             ax.legend().remove()
             cb = plt.colorbar(plt.cm.ScalarMappable(norm=plt.Normalize(df[class_column].min(), df[class_column].max()),
-                                        cmap=colormap), ax=ax)
+                                                    cmap=colormap), ax=ax)
             cb.set_label(label=legend_title, fontsize=legend_title_fontsize)
             cb.ax.tick_params(labelsize=legend_fontsize)
     else:
@@ -2186,19 +2268,21 @@ def parallele_coordinates_plot(df, class_column=None, categorical=True,
             cluster_color_list = cluster_colors['colorSeries']
 
             for i, col in enumerate(DataTools.get_df_col_names_without_cols(df, class_column)):
-                plt.scatter([i]*len(df[col]), df[col], s=marker_size, linewidth=marker_linewidth,
-                            c=cluster_color_list, marker=marker_type, alpha=marker_alpha)
+                ax.scatter([i]*len(df[col]), df[col], s=marker_size, linewidth=marker_linewidth,
+                           c=cluster_color_list, marker=marker_type, alpha=marker_alpha)
 
-    plt.xticks(rotation=xticks_rotation)
-    plt.xlabel(x_title, fontdict={'size': axis_title_fontsize})
-    plt.ylabel(y_title, fontdict={'size': axis_title_fontsize})
-    plt.tight_layout()
+    for tick in ax.get_xticklabels():
+        tick.set_rotation(xticks_rotation)
+    ax.set_xlabel(x_title, fontdict={'size': axis_title_fontsize})
+    ax.set_ylabel(y_title, fontdict={'size': axis_title_fontsize})
+
     if y_gridlines is False:
         ax.grid(False)
 
     ax.set_title(fig_title, fontsize=fig_title_fontsize)
 
     return ax
+
 
 def plot_table(df, row_colors_list=None, col_widths=None, font_size=None):
     """
@@ -2228,6 +2312,112 @@ def plot_table(df, row_colors_list=None, col_widths=None, font_size=None):
             cell.set_text_props(fontproperties=FontProperties(weight='bold',
                                                               size=font_size))
 
+
+def plot_lollipop(values_series, xticklabels, color_labels_series=None, figsize=(8, 4.5),
+                  x_title='', y_title='', x_rotation=90, axis_title_fontsize=12, axis_ticks_fontsize=10,
+                  marker_color='teal', marker_shape='o', markersize=6, markeredgecolor="black", markeredgewidth=0,
+                  stemline_color='black', stemline_linestyle='-', stemline_linewidth=0.7,
+                  baseline_color='black', baseline_linestyle='-', baseline_linewidth=0.7,
+                  color_labels_order=None, color_labels_cmap_dict=None, color_labels_cmap='Set1',
+                  legend_title='', legend_frameon=False, legend_bbox_to_anchor=(1.01, 1),
+                  legend_title_fontsize=12, legend_fontsize=10):
+    '''
+
+    @param values_series: a series (or list) of y axis values
+    @param xticklabels: a series (or list) of x axis labels
+    @param color_labels_series: a series (or list) of labels to use for the coloring of the lollipop markers
+    @param figsize: tuple to pass to matplotlib figsize
+    @param x_title: str. Title of x axis
+    @param y_title: str. Title of y axis
+    @param x_rotation: int. Angle to rotate the x tick labels
+    @param axis_title_fontsize: fontsize of axis titles
+    @param axis_ticks_fontsize: fontsize of axis tick labels
+    @param marker_color: single color for the markers (used if color_labels_series is not given)
+    @param marker_shape: str. shape of the marker. Possible shapes here: https://matplotlib.org/stable/api/markers_api.html
+    @param markersize: int. size of the marker
+    @param markeredgecolor: color of the marker edge line
+    @param markeredgewidth: width of the marker edge line
+    @param stemline_color: stem line color
+    @param stemline_linestyle: stem line style ('-', '--', etc)
+    @param stemline_linewidth: stem line width
+    @param baseline_color: baseline line color
+    @param baseline_linestyle: baseline line color
+    @param baseline_linewidth: baseline line width
+    @param color_labels_order: list of the unique labels that appear in color_labels_series,
+                               by the order they should be presented in the legend (and colored if color_labels_cmap is used)
+    @param color_labels_cmap_dict: a dictionary with the unique labels that appear in color_labels_series
+                                   as keys, and the colors to be used for each label as values.
+    @param color_labels_cmap: a matplotlib cmap string to use for the unique labels in color_labels_series.
+                              Will be used only if color_labels_cmap_dict is not given.
+    @param legend_title: str. A title for the color_labels_series legend
+    @param legend_frameon: bool. Whether to add a square frame to the color_labels_series legend
+    @param legend_bbox_to_anchor: the bbox_to_anchor for the color_labels_series legend
+    @param legend_title_fontsize: title fontsize for the color_labels_series legend
+    @param legend_fontsize: labels fontsize for the color_labels_series legend
+    @return: ax
+    '''
+    if type(values_series) is list:
+        values_series = pd.Series(values_series)
+    if type(color_labels_series) is list:
+        color_labels_series = pd.Series(color_labels_series)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    if color_labels_series is not None: # create marker_colors list from color_series labels
+        if color_labels_cmap_dict is None:
+            # if color_labels_cmap_dict is not given, create it
+            if color_labels_order is not None:
+                assert set(color_labels_order) == set(color_labels_series), 'color_labels_order does not include all labels in color_series'
+                labels_list = color_labels_order
+            else:
+                labels_list = color_labels_series.unique()
+
+            color_labels_cmap_dict = dict(zip(labels_list,
+                                              sns.mpl_palette(color_labels_cmap,
+                                                              n_colors=len(color_labels_series.unique()))))
+            if len(color_labels_cmap_dict) != len(labels_list):
+                raise Exception('color_labels_cmap - cmap doesnt have enough colors for all values.\nPlease use another cmap, or custom color_labels_cmap_dict.')
+
+        marker_colors = pd.DataFrame(color_labels_series).iloc[:, 0].map(color_labels_cmap_dict)
+    else:
+        marker_colors = pd.Series([marker_color]*len(values_series))
+
+    plots = []
+    for i in range(len(values_series)):
+        markers, stemlines, baseline = ax.stem(i, values_series.iloc[i])
+        plots.append((markers, stemlines, baseline))
+
+        plt.setp(markers, marker=marker_shape, markersize=markersize, markeredgecolor=markeredgecolor,
+                 markeredgewidth=markeredgewidth, markerfacecolor=marker_colors.iloc[i])
+        plt.setp(stemlines, color=stemline_color, linestyle=stemline_linestyle, linewidth=stemline_linewidth)
+        plt.setp(baseline, color=baseline_color, linestyle=baseline_linestyle, linewidth=baseline_linewidth)
+
+    ax.set_xticks(list(range(0, len(values_series))))
+    ax.set_xticklabels(xticklabels)
+    ax.set_xlim(-1, len(values_series))
+    plt.setp(ax.get_xticklabels(), rotation=x_rotation)
+
+    handles = []
+    if color_labels_series is not None:
+        if color_labels_order is None:
+            color_labels_order = color_labels_series.unique()
+        for label in color_labels_order:
+            handle = lines.Line2D([0,0], [0,0.5], color=color_labels_cmap_dict[label], label=label,
+                                  marker=marker_shape, linewidth=0, markersize=markersize,
+                                  markeredgecolor=markeredgecolor, markeredgewidth=markeredgewidth)
+            handles.append(handle)
+
+        plt.legend(handles=handles, loc='upper left', bbox_to_anchor=legend_bbox_to_anchor,
+                   frameon=legend_frameon, title=legend_title,
+                   fontsize=legend_fontsize, title_fontsize=legend_title_fontsize)
+
+    ax.set_xlabel(x_title, fontsize=axis_title_fontsize)
+    ax.set_ylabel(y_title, fontsize=axis_title_fontsize)
+    ax.tick_params(axis='both', which='both', length=0)
+    ax.tick_params(axis='both', which='both', labelsize=axis_ticks_fontsize)
+    plt.tight_layout()
+
+    return ax
 
 #### ----------------------------------- Helpers ------------------------------------- ###
 
@@ -2406,22 +2596,29 @@ def bar_plot_add_value_labels(ax, spacing=2, float_num_digits=2,
 
 
 # former addFigCorrelations
-def add_correls_to_fig(figure, col1, col2, font_size=16,
-                       plotPearson=True, plotSpearman=True,
-                       text_x_loc=0.2, text_y_loc=0.96):
+def add_correls_to_fig(figure, col1, col2, font_size=16, plotPearson=True, plotSpearman=True,
+                       text_x_loc=0.2, text_y_loc=0.96, compact_text=False):
+    def corr_text(name, r, pval, compact_text):
+        if not compact_text:
+            add_spaces = '   ' if name=='Pearson' else ''
+            if (pval < 0.001):
+                text = f'{name} r = %2.2f  {add_spaces} p-value = <0.001' % (r)
+            else:
+                text = f'{name} r = %2.2f  {add_spaces} p-value = %2.3f' % (r, pval)
+        else:
+            if (pval < 0.001):
+                text = f'{name} r=%2.2f, p<0.001' % (r)
+            else:
+                text = f'{name} r=%2.2f, p=%2.3f' % (r, pval)
+
+        return text
+
     font = {'size': font_size}
 
     pearR = StatsTools.get_df_cols_correl(col1, col2, method='pearson')
     spearR = StatsTools.get_df_cols_correl(col1, col2, method='spearman')
-    if (pearR[1] < 0.001):
-        text1 = 'Pearson r = %2.2f      p-value = <0.001' % (pearR[0])
-    else:
-        text1 = 'Pearson r = %2.2f      p-value = %2.3f' % (pearR[0], pearR[1])
-
-    if (spearR[1] < 0.001):
-        text2 = 'Spearman r = %2.2f   p-value = <0.001' % (spearR[0])
-    else:
-        text2 = 'Spearman r = %2.2f   p-value = %2.3f' % (spearR[0], spearR[1])
+    text1 = corr_text('Pearson', pearR[0], pearR[1], compact_text)
+    text2 = corr_text('Spearman', spearR[0], spearR[1], compact_text)
 
     if plotPearson:
         figure.text(text_x_loc, text_y_loc, text1, transform = figure.axes.transAxes,
@@ -2736,16 +2933,16 @@ def getColors4categoricalSeries_old(catSeries):
 
 
 def categorCmapFromList(colorlist):
-    cmap = plt.cm.jet
-    cmap = cmap.from_list('Custom cmap', colorlist, len(colorlist))
-    return(cmap)
+    # cmap = plt.cm.jet
+    # cmap = cmap.from_list('Custom cmap', colorlist, len(colorlist))
+
+    cmap = matplotlib.colors.ListedColormap(colorlist, name='Custom cmap', N=len(colorlist))
+
+    return cmap
 
 
 def diverging_cmap_from_list(color_list):
-    cmap = LinearSegmentedColormap.from_list(
-        name='from_color_list',
-        colors=color_list
-        )
+    cmap = LinearSegmentedColormap.from_list(name='from_color_list', colors=color_list)
     return cmap
 
 
@@ -2832,6 +3029,10 @@ def color_rgb_to_hexa_string(rgb_tuple, vals_between_0_1=False):
 
     return '#%02x%02x%02x' % rgb_tuple
 
+def color_hexa_string_to_rgb(hex_string, vals_between_0_1=False):
+    rgb = colors.hex2color(hex_string)
+    mult_by = 1 if vals_between_0_1 else 255
+    return tuple([mult_by*x for x in rgb])
 
 def get_discrete_colormap(n, cmap='jet'):
     '''
@@ -2856,3 +3057,308 @@ def get_discrete_colormap(n, cmap='jet'):
     norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
 
     return cmap, norm
+
+def reorder_legend(ax=None, order=None, unique=False, legend_fontsize=12, legend_title_fontsize=15,
+                   bbox_to_anchor=(1.05, 1), frameon=False, legend_title=None):
+    """
+    Reorder the labels in a legend. Recreates the existing legend.
+
+    Source is an answer in https://stackoverflow.com/questions/22263807/how-is-order-of-items-in-matplotlib-legend-determined
+    and I added my own modifications to it.
+
+    @param ax: matplotlib axes object. If none is given, the last available one is used (plt.gca())
+    @param order: Legend labels new order
+    @param unique: bool. If True, keep only the first of each label's handle (assuming there are duplicates)
+    @param legend_fontsize: legend labels fontsize
+    @param legend_title_fontsize: legend title fontsize
+    @param bbox_to_anchor: legend bbox_to_anchor parameter for determining its position (tuple)
+    @param frameon: bool. Whether the legend is added with a frame or not
+    @param legend_title: str. Title of the legend
+    @return: handles, labels
+    """
+    def unique_everseen(seq, key=None):
+        seen = set()
+        seen_add = seen.add
+        return [x for x,k in zip(seq,key) if not (k in seen or seen_add(k))]
+
+    if ax is None:
+        ax=plt.gca()
+    handles, labels = ax.get_legend_handles_labels()
+    labels, handles = zip(*sorted(zip(labels, handles), key=lambda t: t[0])) # sort both labels and handles by labels
+
+    if order is not None: # Sort according to a given list (not necessarily complete)
+        keys=dict(zip(order,range(len(order))))
+        labels, handles = zip(*sorted(zip(labels, handles), key=lambda t,keys=keys: keys.get(t[0],np.inf)))
+
+    if unique:
+        labels, handles= zip(*unique_everseen(zip(labels,handles), key=labels)) # Keep only the first of each handle
+
+    ax.legend(handles, labels, bbox_to_anchor=bbox_to_anchor, loc=2,
+              borderaxespad=0., frameon=frameon, fontsize=legend_fontsize)
+
+    legText = ax.get_legend().get_texts()
+    bin_text_to_yes_no(legText)
+    if legend_title is not None:
+        ax.get_legend().set_title(legend_title)
+        plt.setp(ax.get_legend().get_title(), fontsize=legend_title_fontsize)
+
+    return handles, labels
+
+def nums_df_to_str_w_thresh(df, thresh=-np.inf, float_num_digits=2, fillna_with=0, add_percent_sym=False):
+    """
+    Gets a numeric df, returns a string df, replacing each number with a string,
+    using given number of digits after the dot. Also, if a number is <= the given
+    threshold, the number will be replaced with a black string.
+    For example:
+        table:
+        1               7.0   9.0      0.0
+        2               1.0   NaN      2.0
+        3               0.0   NaN     15.0
+
+        nums_df_to_str_w_thresh(table, thresh=1, float_num_digits=2, fillna_with=0)
+        output:
+        1              7.00  9.00
+        2                            2.00
+        3                           15.00
+
+
+    @param df: pandas dataframe with only numbers and nans.
+    @param thresh: threshold under which a number will be replaced with an empty string. Default: -np.inf
+    @param float_num_digits: number of digits after the dots to show in string
+    @param fillna_with: value to replace nans in df. Must be numeric or nan. Default: 0
+    @param add_percent_sym: bool. whether to add a '%' symbol to each number.
+    @return: the converted df
+    """
+    annot = df.fillna(fillna_with).copy()
+    for i in annot.index:
+        for j in annot.columns:
+            if annot.loc[i,j] <= thresh:
+                annot.loc[i,j] = ''
+            else:
+                num_str = format(annot.loc[i,j], "." + str(float_num_digits) + "f")
+                if add_percent_sym:
+                    num_str += '%'
+                annot.loc[i,j] = num_str
+
+    return annot
+
+
+def plot_distances_distrib_per_class(dist_matrix, class_series, num_fig_cols=4, figsize=(20, 15), dist_metric_name='', xlim=None, save_path=None):
+    """
+     Function accepts a symmetric distance matrix, and a series of categorical class for each matrix row(/column),
+     with order corresponding to the distance matrix rows(/columns). It then plots the distribution of
+     distances for each class (a grid of distplots).
+
+    :param dist_matrix: A numeric numpy array sized n*n. Symmetric distance matrix.
+    :param class_series: pd.Series of length n. A series of categorical class for each matrix row(/column),
+                         with order corresponding to the distance matrix rows(/columns)
+    :param num_fig_cols: int. Number of columns in the distplots grid.
+    :param figsize: numeric tuple (size 2). figsize of the output figure.
+    :param dist_metric_name: str. Name of the distance metric in dist_matrix, to be used as x axis label in the figure.
+    :param xlim: numeric tuple (size 2). limits of figure x axis.
+    :param save_path: string. Full path to save the figure. If None, figure will not be saved. Default None
+    :return:
+    """
+    class_series = class_series.copy().reset_index(drop=True)
+    num_classes = len(class_series.unique())
+
+    fig, axes = plt.subplots(ncols=num_fig_cols, nrows=math.ceil(num_classes/num_fig_cols),
+                             sharey=False, sharex=True, figsize=figsize)
+    row = 0
+    col = 0
+    for cla in class_series.unique():
+        cla_indices = list(class_series.loc[class_series == cla].index)
+        dist_mat = np.take(dist_matrix, cla_indices, axis=0)
+        dist_mat = np.take(dist_mat, cla_indices, axis=1)
+        distances = list(dist_mat[np.triu_indices(dist_mat.shape[0], k=1)])
+
+        sns.displot(distances, ax=axes[row, col], kde=True)
+        if xlim is not None:
+            axes[row, col].set_xlim(xlim)
+        axes[row, col].set_title(r"$\bf{" + '{:.0f}'.format(cla) + "}$" + f' (n={dist_mat.shape[0]}) \nmedian {np.median(distances)}, mean {np.mean(distances):.1f}\nstd {np.std(distances):.1f}')
+        axes[row, col].set_xlabel(dist_metric_name)
+
+        col += 1
+        if col==num_fig_cols:
+            col = 0
+            row += 1
+
+    plt.tight_layout()
+    if save_path is not None:
+        plt.savefig(save_path, dpi=500, bbox_inches='tight')
+
+
+def plot_distances_kde_per_class(dist_matrix, class_series, figsize=(10, 15), dist_metric_name='', xlim=None,
+                                 save_path=None, color='teal', class_color_dict=None, fill=False, cut=2):
+    """
+     Function accepts a symmetric distance matrix, and a series of categorical class for each matrix row(/column),
+     with order corresponding to the distance matrix rows(/columns). It then plots the distribution of
+     distances for each class (a grid of kdeplots).
+
+    :param dist_matrix: A numeric numpy array sized n*n. Symmetric distance matrix.
+    :param class_series: pd.Series of length n. A series of categorical class for each matrix row(/column),
+                         with order corresponding to the distance matrix rows(/columns)
+    :param num_fig_cols: int. Number of columns in the distplots grid.
+    :param figsize: numeric tuple (size 2). figsize of the output figure.
+    :param dist_metric_name: str. Name of the distance metric in dist_matrix, to be used as x axis label in the figure.
+    :param xlim: numeric tuple (size 2). limits of figure x axis.
+    :param save_path: string. Full path to save the figure. If None, figure will not be saved. Default None
+    :param class_color_dict: dict. Keys are classes from class_seires, Each value is the color for the class kde.
+                             If None, the 'color' param will be used.
+    :param color: string. Color for all classes.
+    :param fill: boolean. Whether to add fill below the kde line
+    :param cut: Distance, in units of bandwidth size, to extend the
+                  density past the extreme datapoints.
+                  Set to 0 to limit the violin range within the range
+                  of the observed data
+    :return: None
+    """
+    class_series = class_series.copy().reset_index(drop=True)
+    num_classes = len(class_series.unique())
+
+    fig, axes = plt.subplots(ncols=1, nrows=num_classes, sharey=False, sharex=True, figsize=figsize)
+    row = 0
+    for cla in class_series.unique():
+        cla_indices = list(class_series.loc[class_series == cla].index)
+        dist_mat = np.take(dist_matrix, cla_indices, axis=0)
+        dist_mat = np.take(dist_mat, cla_indices, axis=1)
+        distances = list(dist_mat[np.triu_indices(dist_mat.shape[0], k=1)])
+
+        sns.kdeplot(distances, ax=axes[row], fill=fill, cut=cut, color=color if class_color_dict is None else class_color_dict[cla])
+        if xlim is not None:
+            axes[row].set_xlim(xlim)
+        axes[row].set_title(r"$\bf{" + '{:.0f}'.format(cla) + "}$" + f' (n={dist_mat.shape[0]}), median {np.median(distances)}, mean {np.mean(distances):.1f}, std {np.std(distances):.1f}')
+        if row==num_classes-1:
+            axes[row].set_xlabel(dist_metric_name)
+
+        row += 1
+
+    # fig.tight_layout()
+    plt.subplots_adjust(hspace=0.5)
+    if save_path is not None:
+        fig.savefig(save_path, dpi=500, bbox_inches='tight')
+
+def plot_kde_per_class(data_series, class_series, figsize=(10, 15), xlabel=None, xlim=None,
+                       save_path=None, color='teal', class_color_dict=None, fill=False, cut=2,
+                       plot_median=False):
+    """
+     Function accepts a numeric data series, and a series of categorical class for each entry
+     (with shared index). It then plots the distribution of data for each class (a grid of kdeplots).
+
+    :param data_series: pd.Series of length n. A numeric data series
+    :param class_series: pd.Series of length n. A series of categorical class for each data_series index
+    :param num_fig_cols: int. Number of columns in the distplots grid.
+    :param figsize: numeric tuple (size 2). figsize of the output figure.
+    :param xlabel: str. Text for x axis label.
+    :param xlim: numeric tuple (size 2). limits of figure x axis.
+    :param save_path: string. Full path to save the figure. If None, figure will not be saved. Default None
+    :param class_color_dict: dict. Keys are classes from class_seires, Each value is the color for the class kde.
+                             If None, the 'color' param will be used.
+    :param color: string. Color for all classes.
+    :param fill: boolean. Whether to add fill below the kde line
+    :param cut: Distance, in units of bandwidth size, to extend the
+              density past the extreme datapoints.
+              Set to 0 to limit the violin range within the range
+              of the observed data    :param plot_median: boolean. If True, adds a vertical line for eah class where its median is.
+    :param plot_median: boolean. If True, adds a vertical line for eah class where its median is.
+
+    :return: None
+    """
+    num_classes = len(class_series.unique())
+    assert data_series.index.equals(class_series.index), 'data_series and class_series index dont match!'
+
+    fig, axes = plt.subplots(ncols=1, nrows=num_classes, sharey=False, sharex=True, figsize=figsize)
+    row = 0
+    for cla in class_series.unique():
+        class_data = data_series.loc[class_series == cla].values
+
+        sns.kdeplot(class_data, ax=axes[row], fill=fill, cut=cut, color=color if class_color_dict is None else class_color_dict[cla])
+        if xlim is not None:
+            axes[row].set_xlim(xlim)
+        axes[row].set_title(r"$\bf{" + str(cla) + "}$" + f' (n={len(class_data)}), median {np.median(class_data)}, mean {np.mean(class_data):.1f}, std {np.std(class_data):.1f}')
+
+        if plot_median:
+            axes[row].vlines(np.median(class_data), *axes[row].get_ylim(), color='silver', linewidth=1.5, linestyles='dashed')
+
+        if row==num_classes-1:
+            if xlabel is None:
+                xlabel = DataTools.get_col_name(data_series)
+            axes[row].set_xlabel(xlabel)
+
+
+        row += 1
+
+    plt.subplots_adjust(hspace=0.5)
+    if save_path is not None:
+        fig.savefig(save_path, dpi=500, bbox_inches='tight')
+
+def plot_distances_median_pairwise_heatmap(dist_matrix, class_series, figsize=(10, 8), annotate_fontsize=10, vmin=None, vmax=None,
+                                           annot_fmt='.0f', cmap_label='', cmap_label_fontsize=15, save_path=None):
+    class_series = class_series.copy().reset_index(drop=True)
+    classes = list(class_series.unique())
+
+    pairwise_class_df = pd.DataFrame(index=classes, columns=classes)
+
+    for cla1 in classes:
+        for cla2 in classes:
+            cla1_indices = list(class_series.loc[class_series == cla1].index)
+            cla2_indices = list(class_series.loc[class_series == cla2].index)
+
+            dist_mat = np.take(dist_matrix, cla1_indices, axis=0)
+            dist_mat = np.take(dist_mat, cla2_indices, axis=1)
+            distances = list(dist_mat.flatten())
+            pairwise_class_df.loc[cla1, cla2] = np.median(distances)
+
+    plt.figure(figsize=figsize)
+    ax = sns.heatmap(pairwise_class_df.astype(float), square=True, cmap='Greens', annot=True,
+                     annot_kws={"size": annotate_fontsize}, fmt=annot_fmt, vmin=vmin, vmax=vmax)
+    ax.collections[0].colorbar.set_label(cmap_label, fontsize=cmap_label_fontsize)
+    for i in range(len(classes)):
+        ax.add_patch(Rectangle((i, i), 1, 1, ec='black', fc='none', lw=1.5, clip_on=False))
+
+    if save_path is not None:
+        plt.savefig(save_path, dpi=500, bbox_inches='tight')
+
+def plot_distances_distrib_pairwise(dist_matrix, class_series, figsize=(20, 15), xlim=None, dist_metric_name='', save_path=None):
+    class_series = class_series.copy().reset_index(drop=True)
+    classes = list(class_series.unique())
+    num_classes = len(classes)
+
+    if xlim is not None:
+        xlim = (np.min(dist_matrix), np.max(dist_matrix))
+
+    fig, axes = plt.subplots(ncols=num_classes, nrows=num_classes,
+                             sharey=False, sharex=True, figsize=figsize)
+    row = 0
+    col = 0
+    for cla1 in classes:
+        for cla2 in classes:
+            if cla1 == cla2:
+                cla_indices = list(class_series.loc[class_series == cla1].index)
+                dist_mat = np.take(dist_matrix, cla_indices, axis=0)
+                dist_mat = np.take(dist_mat, cla_indices, axis=1)
+                distances = list(dist_mat[np.triu_indices(dist_mat.shape[0], k=1)])
+            else:
+                cla1_indices = list(class_series.loc[class_series == cla1].index)
+                cla2_indices = list(class_series.loc[class_series == cla2].index)
+
+                dist_mat = np.take(dist_matrix, cla1_indices, axis=0)
+                dist_mat = np.take(dist_mat, cla2_indices, axis=1)
+                distances = list(dist_mat.flatten())
+
+            color = 'teal' if row != col else 'plum'
+            sns.displot(distances, ax=axes[row, col], color=color, kde=True)
+            axes[row, col].set_ylabel(f'{row+1}\nFrequency' if col==0 else '')
+            axes[row, col].set_xlabel(f'{dist_metric_name}\n{col+1}' if row==(num_classes-1) else '')
+            axes[row, col].set_xlim(xlim)
+            axes[row, col].set_yticklabels([])
+            axes[row, col].tick_params(axis=u'both', which=u'both', length=0)
+
+            col += 1
+            if col==num_classes:
+                col = 0
+                row += 1
+
+    if save_path is not None:
+        fig.savefig(save_path, dpi=500, bbox_inches='tight')
+
