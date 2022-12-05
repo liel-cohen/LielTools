@@ -22,7 +22,6 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colors import Normalize
 from matplotlib.gridspec import GridSpec
 from matplotlib.collections import LineCollection
-import palettable
 import itertools
 from matplotlib.patches import Rectangle
 from mpl_toolkits.axes_grid1 import AxesGrid
@@ -2862,6 +2861,9 @@ def upper_rugplot(data, ax=None, height=.05, color="red", alpha=0.3, linewidth=1
 
 def mapColors2Labels(labels, setStr='Set3', cmap=None):
     """Return pd.Series of colors based on labels"""
+    if 'palettable' not in sys.modules: # palettable is not always installed, so I'm importing it here so that script will not fail if it isn't.
+        import palettable
+
     if cmap is None:
         N = max(3,min(12,len(np.unique(labels))))
         cmap = palettable.colorbrewer.get_map(setStr,'Qualitative',N).mpl_colors

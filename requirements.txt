@@ -1,5 +1,5 @@
 Anaconda 3
 and also packages:
-dill
-palettable
-plotly
+dill (only for FileTools, kerasTools)
+palettable (only for PlotTools function mapColors2Labels)
+plotly (only for PlotlyTools)
