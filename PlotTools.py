@@ -274,6 +274,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
                     row_color_lab_legend_ncol=4, row_color_labels_cmap='Set1',
                     row_color_labels_cmap_dict=None, row_color_labels_order=None,
                     row_color_legend_frameon=True,
+                    row_color_legend_mapper_labels=None,
 
                     col_color_vals=None, col_cmap='Blues',
                     col_vmin=None, col_vmax=None,
@@ -284,7 +285,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
                     col_color_legend_frameon=True,
 
                     rowcol_color_legend_fontsize=10, rowcol_color_legend_title='',
-                    rowcol_color_legend_title_fontsize=11,
+                    rowcol_color_legend_title_fontsize=11,rowcol_color_legend_labelcolor='black',
 
                     col_names_to_frame=None, row_names_to_frame=None,
                     names_frame_color='black', names_frame_width=4,
@@ -478,14 +479,19 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
         if row_color_labels_order is None:
             row_color_labels_order = row_color_labels.unique()
         for label in row_color_labels_order:
+            if row_color_legend_mapper_labels is not None:
+                labeln = row_color_legend_mapper_labels[label]
+            else:
+                labeln = label
             grid.ax_col_dendrogram.bar(0, 0, color=row_color_labels_cmap_dict[label],
-                                    label=label, linewidth=0)
+                                    label=labeln, linewidth=0)
         grid.ax_col_dendrogram.legend(loc=row_color_lab_legend_loc,
                                       ncol=row_color_lab_legend_ncol,
                                       prop={"size": rowcol_color_legend_fontsize},
                                       title=rowcol_color_legend_title,
                                       title_fontsize=rowcol_color_legend_title_fontsize,
-                                      frameon=row_color_legend_frameon)
+                                      frameon=row_color_legend_frameon,
+                                      labelcolor=rowcol_color_legend_labelcolor)
 
     # col side colors legend
     if col_color_labels is not None and col_color_lab_legend:
