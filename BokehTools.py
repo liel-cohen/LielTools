@@ -24,3 +24,4 @@ def categ_colormapper_f_color_list(categories, colors, rgb_or_hexa, rgb_vals_bet
 
 
 ##### check out C:\Users\liel-\Dropbox\PyCharm\PycharmProjectsNew\COVID_mutations\ab ranking\2021_12_26 ab ranking.py
+##### check out C:\Users\Liel\Dropbox\PyCharm\PycharmProjectsNew\COVID_pipeline\ab_plot_functions.py

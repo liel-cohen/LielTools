@@ -16,6 +16,7 @@ from sklearn.metrics import roc_curve
 from sklearn.metrics import auc
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import classification_report
+from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import precision_score
 from sklearn.metrics import average_precision_score
@@ -486,7 +487,7 @@ def adjustY4vars(data, yColName, xColsNamesList, ResidualsVsFitted=True):
 
 
 def ML_model_test(fitted_model, df, y_col_name, x_cols_list,
-                   drop_na, add_constant, logistic=True, calc_roc_auc=True, suppress_stand_message=False):
+                  drop_na, add_constant, logistic=True, calc_roc_auc=True, suppress_stand_message=False):
     ''' Test a GLM model with data in df (after dropping rows with NAs).
         fitted_model - model that was fitted to similar data, that has a .predict(x) function.
         df - data to test the model on. Pandas dataframe
@@ -521,7 +522,7 @@ def ML_model_test(fitted_model, df, y_col_name, x_cols_list,
                                       df_final[x_cols_list].loc[df_final[y_col_name] == 0].mean()
         if calc_roc_auc:
             results_dict['roc_auc_info'] = roc_auc(y_true=results_dict['y_true'],
-                                               y_pred=results_dict['y_pred'])
+                                                   y_pred=results_dict['y_pred'])
     else:
         results_dict['RMSE'] = root_mean_squared_error(results_dict['y_true'],
                                                        results_dict['y_pred'])
@@ -575,7 +576,7 @@ def GLM_model(df, y_col_name, x_cols_list, logistic=True,
 
             results_dict[coef_type] = coef_func(fitted_model.params[x_cols_list])
             results_dict[coef_type + ' conf intervals'] = \
-                        fitted_model.conf_int().rename(columns={0: 'Lower', 1: 'Upper'})
+                         fitted_model.conf_int().rename(columns={0: 'Lower', 1: 'Upper'})
             results_dict['pvalues'] = fitted_model.pvalues
 
         results_dict['model'] = fitted_model
@@ -800,7 +801,7 @@ def measures_from_2by2_conf_mat(conf_mat):
                 # 'false_negative_rate': false_negative_rate,
                 # 'false_positive_rate': false_positive_rate,
                 # 'false_discovery_rate': false_discovery_rate,
-               }
+                }
     return measures
 
 def plot_confusion_matrix(y_true, y_pred, classes_names, add_border_diag=True, add_class_size=False, annot_fontsize=11):
@@ -948,22 +949,41 @@ def metrics_multiclass_f_preds(y_true, y_pred): # TODO might need to debug
     res['average_precision'] = average_precision_score(y_true, y_pred, average='macro', multi_class='ovr')
     return res
 
-def metrics_binary_predictions(y_true, y_pred):
+def metrics_binary_predictions(y_true, y_pred, threshold=0.5):
     """
-    :param conf_mat: array, confusion matrix
-    :return: A dictionary with measures:
+    :param y_true: np.array of true values
+    :param y_pred: np.array of prediction values. Either binary (0, 1) or predicted probabilities (values between 0-1).
+                   If predicted probabilities are given, the given threshold will be used to binarize the probabilities
+                   into predicted labels of 0 (pred <= threshold) and 1 (pred > threshold),
+                   to calculate metrics that require labels and not probabilities.
+    :return: A dictionary with different measures.
+
+    * https://glassboxmedicine.com/2019/03/02/measuring-performance-auprc/#:~:text=The%20%E2%80%9Caverage%20precision%E2%80%9D%20is%20one,method%20for%20calculating%20the%20AUPRC.&text=The%20figure%20above%20shows%20some,under%20the%20receiver%20operating%20characteristic).
+    To calculate AUPRC, we calculate the area under the PR curve. There are multiple methods for calculation of the
+    area under the PR curve, including the lower trapezoid estimator, the interpolated median estimator, and the average precision.
+    I like to use average precision to calculate AUPRC. From the function documentation, the average precision
+    “summarizes a precision-recall curve as the weighted mean of precisions achieved at each threshold,
+    with the increase in recall from the previous threshold used as the weight. […] This implementation is not interpolated
+    and is different from outputting the area under the precision-recall curve with the trapezoidal rule,
+    which uses linear interpolation and can be too optimistic.”
     """
-    conf_mat = confusion_matrix(y_true, y_pred)
+    if len(np.unique(y_pred)) > 2:
+        y_pred_bin = np.where(y_pred > threshold, 1, 0)
+        y_pred_bin = y_pred_bin.astype(y_true.dtype)
+    else:
+        y_pred_bin = y_pred
+
+    conf_mat = confusion_matrix(y_true, y_pred_bin)
     if conf_mat.shape == (2,2):
         tn = conf_mat[0,0]
         fp = conf_mat[0,1]
         fn = conf_mat[1,0]
         tp = conf_mat[1,1]
     elif conf_mat.shape == (1, 1): # all true and predicted labels are the same single value: 0 or 1
-        if y_true[0] == 0: # all true and predicted labels are 0
+        if all(y_true == 0): # all true and predicted labels are 0
             tn = conf_mat[0,0]
             tp, fp, fn = 0, 0, 0
-        elif y_true[0] == 1: # all true and predicted labels are 0
+        elif all(y_true == 1): # all true and predicted labels are 1
             tp = conf_mat[0,0]
             tn, fp, fn = 0, 0, 0
         else:
@@ -976,18 +996,27 @@ def metrics_binary_predictions(y_true, y_pred):
     except ValueError:
         roc_auc = 0
 
+    try:
+        precision_cur, recall_cur, _ = precision_recall_curve(y_true, y_pred)
+        pre_rec_auc = auc(recall_cur, precision_cur)
+    except ValueError:
+        pre_rec_auc = 0
+
     metrics = {'tp': tp,
-                'fp': fp,
-                'fn': fn,
-                'tn': tn,
-                'accuracy': sklearn.metrics.accuracy_score(y_true, y_pred),
-                'balanced_accuracy': sklearn.metrics.balanced_accuracy_score(y_true, y_pred),
-                'precision': sklearn.metrics.precision_score(y_true, y_pred),
-                'recall': sklearn.metrics.recall_score(y_true, y_pred),
-                'sensitivity': sklearn.metrics.recall_score(y_true, y_pred),
-                'specificity': sklearn.metrics.recall_score(y_true, y_pred, pos_label=0),
-                'f1': sklearn.metrics.f1_score(y_true, y_pred),
-                'roc_auc': roc_auc,
+               'fp': fp,
+               'fn': fn,
+               'tn': tn,
+               'accuracy': sklearn.metrics.accuracy_score(y_true, y_pred_bin),
+               'balanced_accuracy': sklearn.metrics.balanced_accuracy_score(y_true, y_pred_bin),
+               'precision': sklearn.metrics.precision_score(y_true, y_pred_bin),
+               'recall': sklearn.metrics.recall_score(y_true, y_pred_bin),
+               'sensitivity': sklearn.metrics.recall_score(y_true, y_pred_bin),
+               'specificity': sklearn.metrics.recall_score(y_true, y_pred_bin, pos_label=0),
+               'f1': sklearn.metrics.f1_score(y_true, y_pred_bin),
+               'f1.5': sklearn.metrics.fbeta_score(y_true, y_pred_bin, beta=1.5),
+               'roc_auc': roc_auc,
+               'pr_auc': pre_rec_auc,
+               'average_precision': average_precision_score(y_true, y_pred),
                }
     return metrics
 
@@ -1130,7 +1159,7 @@ def get_class_preds_sklearn_model(model, preds_proba, class_name, raise_exceptio
     If the class is not in the model classes list, will return none or raise an error.
     @param model: sklearn model object
     @param preds_proba: predicted class probabilities, output from function model.predict_proba
-    @param class_name: target class identifier (string/int. according to the model y_train vector)
+    @param class_name: target class name (string/int. One of the values from the model's y_train vector)
     @param raise_exception: boolean. Whether to raise an error if the requested class is
                             not in the model classes list.
     @return: the vector of predictions for the specified class, from preds_proba

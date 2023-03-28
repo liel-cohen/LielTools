@@ -726,3 +726,13 @@ def list_first_values_equal(list1, start_from=1):
 def flatten_list_of_lists(list_of_lists):
     # If data is large or deeply nested, there are more efficient solutions here: https://stackoverflow.com/questions/952914/how-do-i-make-a-flat-list-out-of-a-list-of-lists
     return [item for lst in list_of_lists for item in lst]
+
+def print_list(list1, print_func=print):
+    """
+    Prints a list, with each item on a new line.
+    :param list1: list
+    :param print_func: print function to use. Default print
+    :return: None
+    """
+    for item in list1:
+        print_func(item)

@@ -18,6 +18,7 @@ import matplotlib.cm as cm
 import matplotlib.colors
 from matplotlib import lines
 import random
+from matplotlib.patches import Patch
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colors import Normalize
 from matplotlib.gridspec import GridSpec
@@ -41,7 +42,7 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                  ax=None, order=None, hue_order=None, palette=None,
                  figsize=(7, 6), showfliers=False, plotTitle='', xTitle='', yTitle='',
                  xRotation=45, titleFontSize=18, titleColor='maroon', legendTitle='',
-                 font_scale=1, snsStyle='ticks', boxTransparency=0.6, jitter=0.15,
+                 font_scale=1, ticklabels_fontsize=None, snsStyle='ticks', boxTransparency=0.6, jitter=0.15,
                  stripplot_alpha=0.7, stripplot_size=4, stripplot_color=None,
                  linewidth=0, stripplot_palette=None,
                  xy_title_fontsize=None,
@@ -98,6 +99,7 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
     @param titleColor:
     @param legendTitle:
     @param font_scale:
+    @param ticklabels_fontsize: If given, will be used for the ticklabels font size. Default None
     @param snsStyle:
     @param boxTransparency:
     @param jitter:
@@ -252,6 +254,14 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
                            c=mean_color, marker=mean_marker, alpha=mean_alpha,
                            zorder=10)
 
+        if add_mean_text: # currently only work if Hue=None # TODO
+            xticklabels = []
+            for i, label in enumerate(order):
+                mean = data.loc[data[DataTools.get_col_name(seriesX)] == label,
+                                DataTools.get_col_name(seriesY)].mean()
+                xticklabels.append(f'{label}\n({mean:.3f})')
+            ax.set_xticklabels(xticklabels)
+
         if add_gmean: # currently only work if Hue=None # TODO
             for i, label in enumerate(order):
                 gmean = data.loc[data[DataTools.get_col_name(seriesX)] == label,
@@ -352,13 +362,8 @@ def plot_boxplot(seriesX, seriesY, seriesHue=None,
         for x in ax.get_xticks():
             ax.axvline(x+.5, color='k')
 
-    if add_mean_text: # currently only work if Hue=None # TODO
-        xticklabels = []
-        for i, label in enumerate(order):
-            mean = data.loc[data[DataTools.get_col_name(seriesX)] == label,
-                            DataTools.get_col_name(seriesY)].mean()
-            xticklabels.append(f'{label}\n({mean:.3f})')
-        ax.set_xticklabels(xticklabels)
+    if ticklabels_fontsize is not None:
+        ax.tick_params(axis='both', which='major', labelsize=ticklabels_fontsize)
 
     plt.tight_layout()
 
@@ -472,7 +477,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
                     annotation_format=".2f",
 
                     cbar_title='', cbar_orient='vertical',
-                    cbar_pos=None,
+                    cbar_pos=None, cbar_ticks=None,
                     cbar_vertical_left=False, cbar_vertical_left_x_factor=3/5,
                     cbar_title_fontsize=None, cbar_ticks_fontsize=None,
                     hide_cbar=False,
@@ -660,7 +665,8 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
     grid = sns.clustermap(numbersTable, cmap=cmap, norm=norm, figsize=figsize,
                           row_cluster=row_clustering, col_cluster=col_clustering,
                           cbar_kws={'label': cbar_title,
-                                    'orientation': cbar_orient},
+                                    'orientation': cbar_orient,
+                                    'ticks': cbar_ticks},
                           row_colors=row_colors, col_colors=col_colors,
                           mask=mask, vmin=vmin, vmax=vmax,
                           linewidths=linewidths, linecolor=linecolor,
@@ -703,8 +709,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
 
     if cbar_pos is not None:
         grid.cax.set_position(cbar_pos)
-        print('Warning: if using command plt.tight_layout or subplots_adjust, cax position \n'
-              'may be distorted and has to be redefined after the command.')
+        print('plot_clustermap warning: cbar pos was set manually. Using command plt.tight_layout or subplots_adjust may distort the position.')
 
     if cbar_title_fontsize is not None:
         grid.cax.yaxis.label.set_size(cbar_title_fontsize)
@@ -795,7 +800,7 @@ def plot_clustermap(numbersTable, cmap='YlGnBu', norm=None, figsize=(8, 8),
 
 # former plotHeatmap_real
 def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
-                 title='', title_fontsize=13, ax=None,
+                 title='', title_fontsize=13, ax=None, cbar_ax=None,
                  font_scale=1, snsStyle='ticks', xRotation=0,
                  yRotation=90, square=False,
                  xlabel='', ylabel='',
@@ -819,7 +824,7 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
     if ax is None:
         plt.figure(figsize=figsize, dpi=300)
 
-    ax = sns.heatmap(numbersTable, cmap=cmap, vmin=vmin, vmax=vmax, ax=ax,
+    ax = sns.heatmap(numbersTable, cmap=cmap, vmin=vmin, vmax=vmax, ax=ax, cbar_ax=cbar_ax, # TODO make sure cbar_ax is OK. It's a new thing
                      annot=annotate_text, annot_kws={"size": annotate_fontsize},
                      fmt=annotation_format, mask=mask, cbar=not hide_colorbar,
                      cbar_kws={"ticks": colorbar_ticks}, square=square,
@@ -851,9 +856,9 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
         ax.tick_params(axis=u'both', which=u'both', length=0)
         try:
             if not hide_colorbar:
-                ax.collections[0].colorbar.tick_params(axis=u'both', which=u'both', length=0)
+                ax.collections[0].colorbar.ax.tick_params(axis=u'both', which=u'both', length=0)
         except Exception:
-            print("Could not perform line: \nax.collections[0].colorbar.tick_params(axis=u'both', which=u'both', length=0) \nin LielTools_v3\PlotTools.py")
+            print("Could not perform line: \nax.collections[0].colorbar.ax.tick_params(axis=u'both', which=u'both', length=0) in PlotTools.py")
 
     if color_specific_xticklabels is not None:
         for i, xticklabel in enumerate(ax.get_xticklabels()):
@@ -875,15 +880,13 @@ def plot_heatmap(numbersTable, cmap='YlGnBu', figsize=(8, 8),
 
     return ax
 
-def plot_violinplot(series_x, series_y, series_hue=None,
-                    ax=None, figsize=(7, 6),
-                    cut=0, scale="count", inner=None,
-                    split=True, orient='v',
+def plot_violinplot(series_x, series_y, series_hue=None, ax=None, figsize=(7, 6),
+                    cut=0, scale="count", inner=None, split=True, orient='v',
                     plot_title='', x_title='', y_title='', legend_title='',
                     x_rotation=90, title_fontsize=18, title_color='maroon',
                     font_scale=1, sns_style='ticks',
                     color=None, palette=None, x_order=None,
-                    xy_title_fontsize=14):
+                    xy_title_fontsize=14, legend_title_fontsize=14, legend_bbox_to_anchor=(1.05, 1)):
     """
 
     :param series_x: pd.Series of values for x axis (categories)
@@ -924,6 +927,7 @@ def plot_violinplot(series_x, series_y, series_hue=None,
     :param x_order: list of x axis categories by the requested display order.
                     Default None - automatic order
     :param xy_title_fontsize: fontsize of x and y axis titles
+    :param legend_bbox_to_anchor: bbox_to_anchor position of the legend. Default (1.05, 1)
     :return: matplotlib axes object.
     """
     sns.set(font_scale=font_scale)
@@ -967,8 +971,8 @@ def plot_violinplot(series_x, series_y, series_hue=None,
 
     if series_hue is not None:
         ax.legend_.remove()
-        plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
-                   frameon=False, title=legend_title)
+        plt.legend(bbox_to_anchor=legend_bbox_to_anchor, loc=2, borderaxespad=0.,
+                   frameon=False, title=legend_title, title_fontsize=legend_title_fontsize)
 
         # if legend is binary, change 0,1 to no,yes
         legText = ax.get_legend().get_texts()
@@ -986,8 +990,8 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
                         figsize=(6,5), xtitle=None, ytitle=None,
                         palette='Set1', jitter=0.05, jitter_y=None,
                         dot_size=4, dot_color='grey', violin_alpha=0.8,
-                        stripplot_alpha=0.3, boxplot_width=0.3,
-                        box_lines_color='#404040', box_lines_width=2,
+                        stripplot_alpha=0.3, boxplot_width=0.3, boxplot_whis=1.5,
+                        box_lines_color='#404040', box_lines_width=2, box_median_line_width=1,
                         dots_x_offset=0.002, order=None, x_rotation=0,
                         xy_title_fontsize=12, font_scale=1, violin_cut=2,
                         hide_indices_in_stripplot=None,
@@ -1000,7 +1004,12 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
 
                         add_mean=False,
                         mean_marker='_', mean_color='red',
-                        mean_size=100, mean_linewidth=3, mean_alpha=1):
+                        mean_size=100, mean_linewidth=3, mean_alpha=1,
+
+                        add_median_marker=False,
+                        median_marker='D', median_marker_color='black',
+                        median_marker_size=100, median_marker_linewidth=3, median_marker_alpha=1
+                        ):
     """
     Plot a violin plot with a boxplot and stripplot on top.
 
@@ -1023,8 +1032,10 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
     @param violin_alpha: violin alpha (transparency)
     @param stripplot_alpha: stripplot dots alpha (transparency)
     @param boxplot_width: width of boxplot
+    @param boxplot_whis: whis parameter in seaborn boxplot
     @param box_lines_color: color of the boxplot lines (box frame, whiskers etc.)
-    @param box_lines_width: linewidth of the boxplot lines (box frame, whiskers etc.)
+    @param box_lines_width: linewidth of the boxplot lines (box frame, whiskers)
+    @param box_median_line_width: linewidth of the boxplot median line
     @param dots_x_offset: offset of stripplot dots from the center of violin
                           plot (only when it's cut in half)
     @param order: list. order of x values
@@ -1039,8 +1050,10 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
     @param hide_indices_in_stripplot: list of df indices to exclude from stripplot
     @param connect_pairs: list of pairs (tuples) of indices. If stripplot=True and cut_in_half=False,
                           will connect the stripplot markers of each pair with a line.
+
     @param add_mean_text: boolean. Whether to add the mean value for each boxplot in its x label.
     @param mean_text_num_digits: int. Number of digits after the dot for the mean in the x labels.
+
     @param add_mean: boolean. Whether to add a marker showing the mean value for each boxplot.
                      Currently works only if hue isn't used. Default False
     @param mean_marker: str. Marker symbol for the mean. Default '_'
@@ -1048,6 +1061,16 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
     @param mean_size: mean marker size
     @param mean_linewidth: mean marker line width
     @param mean_alpha: mean marker alpha
+
+    @param add_median_marker: boolean. Whether to add a marker showing the median value for each boxplot.
+                     Currently works only if hue isn't used. Default False.
+                     *If you prefer a median marker instead of the boxplot median line, use this, and set
+                     box_median_line_width=0.
+    @param median_marker: str. Marker symbol for the median. Default '_'
+    @param median_marker_color: str. Color for the median. Default 'red'
+    @param median_marker_size: median marker size
+    @param median_marker_linewidth: median marker line width
+    @param median_marker_alpha: median marker alpha
 
     :return: axes object
     """
@@ -1085,8 +1108,8 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
                 boxprops={'zorder': 3, 'fill': False, 'color': box_lines_color, 'linewidth': box_lines_width, 'alpha': 0.7},
                 capprops={'color': box_lines_color, 'linewidth': box_lines_width, 'alpha': 0.7},
                 whiskerprops={'color': box_lines_color, 'linewidth': box_lines_width, 'alpha': 0.7},
-                medianprops={'color': box_lines_color, 'linewidth': box_lines_width, 'alpha': 0.7},
-                )
+                medianprops={'color': box_lines_color, 'linewidth': box_median_line_width, 'alpha': 0.7},
+                whis=boxplot_whis)
     old_len_collections = len(ax.collections)
 
     ### stripplot
@@ -1172,6 +1195,13 @@ def plot_violin_boxplot(df, x, y, cut_in_half=True, stripplot=True,
                        c=mean_color, marker=mean_marker, alpha=mean_alpha,
                        zorder=10)
 
+    if add_median_marker: # currently only work if Hue=None # TODO
+        for i, label in enumerate(order):
+            median = df.loc[df[x] == label, y].median()
+            ax.scatter(i, median, s=median_marker_size, linewidth=median_marker_linewidth,
+                       c=median_marker_color, marker=median_marker, alpha=median_marker_alpha,
+                       zorder=10)
+
     if add_mean_text: # currently only work if Hue=None # TODO
         xticklabels = []
         for i, label in enumerate(order):
@@ -1246,8 +1276,9 @@ def DFbarPlot(data, columns=None, figsize=(6, 4), plotTitle='',
               stacked=False,
               add_value_labels=False, float_num_digits=2,
               value_labels_fontsize=12, value_labels_rotation=0,
-              savePath=None, color_list=None, value_labels_spacing=2,
+              savePath=None, color_list=['teal'], value_labels_spacing=2,
               plotOnaxes=None, legend_order=None):
+    """ For some reason I could not figure out, sometimes has problems with subplots. Use plot_barplot_from_series instead."""
     if ax is None and plotOnaxes is not None: # retain backwards compatability for plotOnaxes (renamed to ax)
         ax = plotOnaxes
 
@@ -1293,7 +1324,7 @@ def DFbarPlot(data, columns=None, figsize=(6, 4), plotTitle='',
 
         legText = ax.get_legend().get_texts()
         legText = bin_text_to_yes_no(legText)
-        if (legendTitle is not None):
+        if legendTitle is not None:
             ax.get_legend().set_title(legendTitle)
             plt.setp(ax.get_legend().get_title(),
                      fontsize=legendTitleFontSize)
@@ -1327,7 +1358,6 @@ def DFbarPlot(data, columns=None, figsize=(6, 4), plotTitle='',
                        legend_fontsize=legendFontSize, legend_title_fontsize=legendTitleFontSize,
                        frameon=legend_frameon)
 
-    # plt.tight_layout()
     save_plt(save_path=savePath)
 
     return ax
@@ -1850,6 +1880,33 @@ def plot_distplot_old(vals, ax=None, bins=30, figsize=(30, 20),
                       )
     for tick in ax.get_xticklabels():
         tick.set_rotation(x_rotation)
+
+    return ax
+
+def plot_histplot(vals, ax=None, bins=30, figsize=(30, 20), kde=True, kde_color='g', hist_color='g', hist_alpha=0.3,
+                  bw_adjust=1, font_scale=1, sns_style='ticks', x_rotation=0, y_rotation=0, title='', ylabel='', xlabel='',
+                  axes_titles_fontsize=8, axes_ticklabels_fontsize=8, title_fontsize=12):
+    sns.set(font_scale=font_scale)
+    sns.set_style(sns_style)
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    ax = sns.histplot(vals, ax=ax, bins=bins, color=hist_color, alpha=hist_alpha,
+                      kde=kde, line_kws={"color": kde_color}, kde_kws={"bw_adjust": bw_adjust})
+
+    ax.set_ylabel(ylabel, size=axes_titles_fontsize)
+    ax.set_xlabel(xlabel, size=axes_titles_fontsize)
+
+    for tick in ax.get_yticklabels():
+        tick.set_rotation(y_rotation)
+    for tick in ax.get_xticklabels():
+        tick.set_rotation(x_rotation)
+
+    ax.set_title(title, fontsize=title_fontsize)
+
+    for label in (ax.get_xticklabels() + ax.get_yticklabels()):
+        label.set_fontsize(axes_ticklabels_fontsize)
 
     return ax
 
@@ -3240,6 +3297,111 @@ def plot_distances_kde_per_class(dist_matrix, class_series, figsize=(10, 15), di
     if save_path is not None:
         fig.savefig(save_path, dpi=500, bbox_inches='tight')
 
+
+def plot_distances_joyplot_per_class(dist_matrix, class_series, class_order=None, figsize=(10, 15), add_all_distribution=True,
+                                     class_color_dict=None, all_color='#1a1a1a', dist_metric_label='', ylabel='Class',
+                                     fill=False, overlap=0.6, alpha=0.75, cut_kde_to_data_limits=True,
+                                     class_label_y_pos=-0.05, ticklabels_fontsize=15, labels_fontsize=18,
+                                     add_median=False, median_num_digits=1, classes_text_bold=False, save_path=None):
+    """
+     Function accepts a symmetric distance matrix, and a series of categorical class for each matrix row (and column),
+     with order corresponding to the distance matrix rows (and columns). It then plots the distribution of
+     distances for each class using a ridgeplot/joyplot, using the joypy package. A joint distribution of all classes
+     will also be added (named "All").
+    :param dist_matrix: A numeric numpy array sized n*n. Symmetric distance matrix.
+    :param class_series: pd.Series of length n. A series of categorical class for each matrix row (and column),
+                         with order corresponding to the distance matrix rows (and columns)
+    :param class_order: list. Order of classes in the plot. If None, classes will be ordered by their appearance in class_series.
+    :param figsize: numeric tuple (size 2). figsize of the output figure.
+    :param add_all_distribution: boolean. Whether to add a joint distribution of all classes (named "All").
+    :param class_color_dict: dict. Keys are classes from class_seires, Each value is the color for the class kde.
+    :param all_color: string. Color for the "All" kde.
+    :param dist_metric_label: str. Name of the distance metric in dist_matrix, to be used as x axis label in the figure.
+    :param ylabel: str. Name of the class column, to be used as y axis label in the figure.
+    :param fill: boolean. Whether to add fill below the kde line
+    :param overlap: float. The amount of overlap between the kdes of each class.
+    :param alpha: float. The alpha value of the kde fill.
+    :param cut_kde_to_data_limits: boolean. whether to limit the density to the data limits (min max vals) of each class.
+    :param class_label_y_pos: float. The position of the ylabel relative to the y axis.
+    :param ticklabels_fontsize: int. Font size of the tick labels.
+    :param labels_fontsize: int. Font size of the axis labels.
+    :param add_median: boolean. Whether to add the median value of each class to the ticklabels.
+    :param median_num_digits: int. Number of digits to round the median value to.
+    :param save_path: string. Full path to save the figure. If None, figure will not be saved. Default None
+    :return:
+    """
+    import joypy
+
+    def get_distances_for_ind(dist_matrix, indices):
+        """ Get a list of the pairwise distances (upper triangle only) for given indices in dist_matrix (numpy array) """
+        dist_mat = np.take(dist_matrix, indices, axis=0)
+        dist_mat = np.take(dist_mat, indices, axis=1)
+        distances = list(dist_mat[np.triu_indices(dist_mat.shape[0], k=1)])
+        return distances
+
+    class_series = class_series.copy().reset_index(drop=True)
+    if class_order is None:
+        class_order = list(class_series.unique())
+
+    dists_df = pd.DataFrame(columns=['dist', 'class'])
+    for cla in class_order:
+        # get distances for class
+        cla_indices = list(class_series.loc[class_series == cla].index)
+        distances = get_distances_for_ind(dist_matrix, cla_indices)
+        # add distances to dists_df with class
+        dists_df = dists_df.append(pd.DataFrame({'dist': distances, 'class': cla}))
+
+    if add_all_distribution:
+        # add all distances as well with class name "all"
+        all_distances = get_distances_for_ind(dist_matrix, list(range(dist_matrix.shape[0])))
+        dists_df = dists_df.append(pd.DataFrame({'dist': all_distances, 'class': 'All'}))
+
+    dists_df = dists_df.reset_index(drop=True)
+    dists_df['dist'] = dists_df['dist'].astype(float)
+
+    dists_df['class'] = dists_df['class'].astype('category')
+    if add_all_distribution:
+        dists_df['class'] = dists_df['class'].cat.set_categories(class_order + ['All'], ordered=True)
+    else:
+        dists_df['class'] = dists_df['class'].cat.set_categories(class_order, ordered=True)
+
+    ##### plot
+    # obtain a list of colors from class_color_dict by the classes order and add all_color for the 'All' class
+    colors = [class_color_dict[cla] for cla in class_order]
+    if add_all_distribution:
+        colors += [all_color]
+
+    fig, axes = joypy.joyplot(dists_df, column='dist', by='class', fill=fill,
+                              colormap=categorCmapFromList(colors), figsize=figsize, overlap=overlap, alpha=alpha,
+                              range_style='own' if cut_kde_to_data_limits else 'all')
+    if add_median:
+        for ax in axes:
+            ylab = ax.get_yticklabels()[0].get_text()
+            if ylab != '':
+                if ylab == 'All':
+                    median_val = dists_df['dist'].median()
+                else:
+                    median_val = dists_df.loc[dists_df['class'].astype(str)==ylab, 'dist'].median()
+                ax.set_yticklabels([r'$\bf{' + ylab + r'}$ (' + format(median_val, "." + str(median_num_digits) + "f") + ')'], fontsize=ticklabels_fontsize)
+    else: # only format text (size, bold if indicated)
+        for ax in axes:
+            ylab = ax.get_yticklabels()[0].get_text()
+            if classes_text_bold:
+                ax.set_yticklabels([r'$\bf{' + ylab + r'}$'], fontsize=ticklabels_fontsize)
+            else:
+                ax.set_yticklabels([ylab], fontsize=ticklabels_fontsize)
+
+    # set xticklabels fontsize
+    for ax in axes:
+        ax.tick_params(axis='x', labelsize=ticklabels_fontsize)
+
+    plt.xlabel(dist_metric_label, fontsize=labels_fontsize)
+    fig.text(class_label_y_pos, 0.5, ylabel, va='center', rotation='vertical', fontsize=labels_fontsize)
+
+    if save_path is not None:
+        fig.savefig(save_path, dpi=500, bbox_inches='tight')
+
+
 def plot_kde_per_class(data_series, class_series, figsize=(10, 15), xlabel=None, xlim=None,
                        save_path=None, color='teal', class_color_dict=None, fill=False, cut=2,
                        plot_median=False):
@@ -3296,6 +3458,10 @@ def plot_kde_per_class(data_series, class_series, figsize=(10, 15), xlabel=None,
 
 def plot_distances_median_pairwise_heatmap(dist_matrix, class_series, figsize=(10, 8), annotate_fontsize=10, vmin=None, vmax=None,
                                            annot_fmt='.0f', cmap_label='', cmap_label_fontsize=15, save_path=None):
+    assert type(dist_matrix) is np.ndarray
+    assert dist_matrix.shape[0] == dist_matrix.shape[1]
+    assert dist_matrix.shape[0] == class_series.shape[0]
+
     class_series = class_series.copy().reset_index(drop=True)
     classes = list(class_series.unique())
 
@@ -3322,6 +3488,10 @@ def plot_distances_median_pairwise_heatmap(dist_matrix, class_series, figsize=(1
         plt.savefig(save_path, dpi=500, bbox_inches='tight')
 
 def plot_distances_distrib_pairwise(dist_matrix, class_series, figsize=(20, 15), xlim=None, dist_metric_name='', save_path=None):
+    assert type(dist_matrix) is np.ndarray
+    assert dist_matrix.shape[0] == dist_matrix.shape[1]
+    assert dist_matrix.shape[0] == class_series.shape[0]
+
     class_series = class_series.copy().reset_index(drop=True)
     classes = list(class_series.unique())
     num_classes = len(classes)
@@ -3364,3 +3534,91 @@ def plot_distances_distrib_pairwise(dist_matrix, class_series, figsize=(20, 15),
     if save_path is not None:
         fig.savefig(save_path, dpi=500, bbox_inches='tight')
 
+def plot_distances_distrib_within_between(dist_matrix, class_series, figsize=(20, 15), ax=None,
+                                          dist_metric_name='', class_series_name='', legend_title='Distances', x_order=None,
+                                          palette={'Within': 'teal', 'Between':'salmon'}, split=True,
+                                          font_scale=1.7, xy_title_fontsize=22, legend_title_fontsize=22,
+                                          x_rotation=0, cut=0, scale="area", inner=None,
+                                          save_path=None, legend_bbox_to_anchor=(1.02, 1), despine=False,
+                                          add_pointplot=False):
+    assert type(dist_matrix) is np.ndarray
+    assert dist_matrix.shape[0] == dist_matrix.shape[1]
+    assert dist_matrix.shape[0] == class_series.shape[0]
+
+    class_series = class_series.copy().reset_index(drop=True)
+    classes = list(class_series.unique())
+    num_classes = len(classes)
+
+    dist_df = pd.DataFrame(columns=['Distance', 'Within/Between', 'Class'])
+    for cla1 in classes:
+        # distances within cla1
+        cla1_indices = list(class_series.loc[class_series == cla1].index)
+        dist_mat = np.take(dist_matrix, cla1_indices, axis=0)
+        dist_mat = np.take(dist_mat, cla1_indices, axis=1)
+        distances = list(dist_mat[np.triu_indices(dist_mat.shape[0], k=1)])
+        dist_df = dist_df.append(pd.DataFrame({'Distance': distances,
+                                               'Within/Between': ['Within'] * len(distances),
+                                               'Class': [cla1] * len(distances)}))
+        # distances between cla1 and other classes
+        for cla2 in classes:
+            if cla1 != cla2:
+                cla2_indices = list(class_series.loc[class_series == cla2].index)
+                dist_mat = np.take(dist_matrix, cla1_indices, axis=0)
+                dist_mat = np.take(dist_mat, cla2_indices, axis=1)
+                distances = list(dist_mat.flatten())
+                dist_df = dist_df.append(pd.DataFrame({'Distance': distances,
+                                                       'Within/Between': ['Between'] * len(distances),
+                                                       'Class': [cla1] * len(distances)}))
+
+    dist_df['Distance'] = dist_df['Distance'].astype(float)
+
+    ax = plot_violinplot(dist_df['Class'], dist_df['Distance'], series_hue=dist_df['Within/Between'],
+                         figsize=figsize, cut=cut, scale=scale, inner=inner, split=split, orient='v',
+                         plot_title='', x_title=class_series_name, y_title=dist_metric_name, legend_title=legend_title,
+                         x_rotation=x_rotation, title_fontsize=18, title_color='maroon', font_scale=font_scale, sns_style='ticks',
+                         color=None, palette=palette, x_order=x_order,
+                         xy_title_fontsize=xy_title_fontsize, legend_title_fontsize=legend_title_fontsize,
+                         legend_bbox_to_anchor=legend_bbox_to_anchor)
+    if add_pointplot:
+        sns.pointplot(x="Class", y="Distance", hue="Within/Between", estimator='mean', errorbar=('ci', 95), markers='_',
+                      data=dist_df, dodge=0.25, join=False, palette=['black'], ax=ax, scale=0.8, order=x_order,
+                      errwidth=1)
+        # increase the pointplot marker size
+        points = ax.collections[-2]
+        size = points.get_sizes().item()
+        # new_sizes = [size * 3 if name.get_text() == "Fri" else size for name in ax.get_yticklabels()]
+        points.set_sizes([size*5])
+
+        ax.legend_.remove()
+        legend_elements = [Patch(facecolor=palette['Within'], edgecolor='black', label='Within'),
+                           Patch(facecolor=palette['Between'], edgecolor='black', label='Between')]
+        ax.legend(handles=legend_elements, bbox_to_anchor=legend_bbox_to_anchor, loc=2, borderaxespad=0.,
+                  frameon=False, title=legend_title, title_fontsize=legend_title_fontsize)
+
+    # remove tick marks
+    ax.tick_params(axis=u'both', which=u'both', length=0)
+
+    if despine:
+        sns.despine(ax=ax, left=True, bottom=False, top=True, right=True)
+
+    if save_path is not None:
+        plt.savefig(save_path, dpi=500, bbox_inches='tight')
+
+    return ax
+
+def get_colors_for_categ_fr_sequential_cmap(cmap_name, categories):
+    """
+    Get a dictionary of colors for the given categories from a sequential colormap,
+    by the categories order.
+    :param cmap_name: str. name of a sequential seaborn colormap (not categorical!)
+    :param categories: list of categories
+    :return:
+    """
+    cmap = plt.get_cmap(cmap_name)
+    colors = cmap(np.arange(0, cmap.N))
+    cmap_row_inds = np.linspace(0, cmap.N-1, len(categories), dtype=int)
+    categ_color_dict = {}
+    for i, cmap_row_ind in enumerate(cmap_row_inds):
+        categ_color_dict[categories[i]] = colors[cmap_row_ind,:]
+
+    return categ_color_dict

@@ -233,8 +233,14 @@ def dump_to_pickle(path, my_info):
         my_info = pickle.load(f)
     return my_info
 
-def dict_to_json_txt(d, file_path):
-    json.dump(d, open(file_path, 'w'))
+def dict_to_json_txt(d, file_path, np_array_to_list=False):
+    d_copy = d.copy()
+    if np_array_to_list:
+        for key, value in d_copy.items():
+            if isinstance(value, np.ndarray):
+                d_copy[key] = value.tolist()
+
+    json.dump(d_copy, open(file_path, 'w'))
 
 def json_txt_to_dict(file_path):
     d = json.load(open(file_path))
